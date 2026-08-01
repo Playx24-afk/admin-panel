@@ -218,6 +218,7 @@
                 <li><a class="nav-link" data-section="tournaments-section"><i class="bi bi-trophy-fill"></i> Matches List</a></li>
                 <li><a class="nav-link" data-section="tournament-management-section"><i class="bi bi-flag-fill"></i> Match Results</a></li>
                 <li><a class="nav-link" data-section="match-scheduler-section"><i class="bi bi-calendar-week-fill"></i> Match Scheduler</a></li>
+                <li><a class="nav-link" data-section="smart-activity-section"><i class="bi bi-broadcast"></i> Smart Match Activity</a></li>
                 <li><a class="nav-link" data-section="leaderboard-mgt-section"><i class="bi bi-bar-chart-line-fill"></i> Leaderboard</a></li>
 
                 <div class="nav-label">Growth & Marketing</div>
@@ -620,7 +621,10 @@
                          <div class="row g-4">
                              <div class="col-md-4"><label class="form-label">Minimum Withdrawal (<span class="c-sym">₹</span>)</label><input type="number" class="form-control" id="cfWdMin"></div>
 
-                             <div class="col-12"><label class="form-label mt-3 text-muted">Manual Deposit Settings (If Gateway disabled)</label></div>
+                             <div class="col-12 d-flex align-items-center justify-content-between mt-3">
+                                 <label class="form-label text-muted m-0">Manual Deposit Settings (Users can pay by UPI/QR and submit UTR for approval)</label>
+                                 <div class="form-check form-switch m-0"><input class="form-check-input fs-4 m-0" type="checkbox" id="cfMdTog"></div>
+                             </div>
                              <div class="col-md-6"><label class="form-label">Admin UPI ID</label><input type="text" class="form-control" id="cfUpId"></div>
                              <div class="col-md-6"><label class="form-label">Admin Payment QR Code (URL)</label><input type="url" class="form-control" id="cfUpQr"></div>
                          </div>
@@ -1136,6 +1140,60 @@
                 </div>
             </section>
 
+            <!-- Smart Match Activity -->
+            <section id="smart-activity-section" class="section">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
+                    <h3 class="fw-bold m-0"><i class="bi bi-broadcast text-primary me-2"></i> Smart Match Activity</h3>
+                    <button type="button" class="btn btn-outline-info fw-bold" id="smaRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh Status</button>
+                </div>
+                <p class="text-muted mb-4">Highlights already-real, under-filled matches in the lobby (e.g. "Featured Match" / "Player waiting") so genuine activity is easier to find. This never creates fake players, never changes who can join, and never affects entry fees, prizes, or match start/cancel logic — those always use real registered players only.</p>
+
+                <form id="smaForm">
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <div class="glass-card border-info h-100" style="border-left: 6px solid var(--info);">
+                                <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom border-glass">
+                                    <h5 class="fw-bold m-0"><i class="bi bi-people-fill text-info me-2"></i> 2-Slot Matches</h5>
+                                    <div class="form-check form-switch m-0"><input class="form-check-input fs-4 m-0" type="checkbox" id="sma2Toggle"></div>
+                                </div>
+                                <small class="text-muted d-block mb-2">Applies only to 1v1 / 2-slot matches. Independent of Multi-Slot below.</small>
+                                <label class="form-label mt-2">Apply to Modes</label>
+                                <div id="sma2Modes" class="d-flex flex-column gap-2 p-3 rounded" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass); max-height: 220px; overflow-y: auto;">
+                                    <span class="text-muted small">Loading modes...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="glass-card border-warning h-100" style="border-left: 6px solid var(--warning);">
+                                <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom border-glass">
+                                    <h5 class="fw-bold m-0"><i class="bi bi-people-fill text-warning me-2"></i> Multi-Slot Matches</h5>
+                                    <div class="form-check form-switch m-0"><input class="form-check-input fs-4 m-0" type="checkbox" id="smaMultiToggle"></div>
+                                </div>
+                                <small class="text-muted d-block mb-2">Applies only to matches with more than 2 slots. Independent of 2-Slot above.</small>
+                                <label class="form-label mt-2">Apply to Modes</label>
+                                <div id="smaMultiModes" class="d-flex flex-column gap-2 p-3 rounded" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass); max-height: 220px; overflow-y: auto;">
+                                    <span class="text-muted small">Loading modes...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Maximum Featured Matches <small class="text-muted">(per category, at once)</small></label>
+                            <input type="number" class="form-control" id="smaMaxFeatured" min="1" max="50" value="5">
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn-premium px-5 py-3 fw-bold"><i class="bi bi-save2 me-2"></i> Save Smart Activity Settings</button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="glass-card mt-4">
+                    <h5 class="fw-bold mb-3 pb-3 border-bottom border-glass"><i class="bi bi-graph-up text-success me-2"></i> Live Status</h5>
+                    <div id="smaStatusBlock" class="row g-4">
+                        <div class="col-12 text-muted">Click "Refresh Status" to load current activity.</div>
+                    </div>
+                </div>
+            </section>
+
             <section id="leaderboard-mgt-section" class="section">
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                     <h3 class="fw-bold m-0"><i class="bi bi-bar-chart-line-fill text-info me-2"></i> Leaderboard Customization</h3>
@@ -1500,7 +1558,7 @@
          "Confirm & Send Winnings" is clicked. -->
     <div class="modal fade" id="msBulkVerifyModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-success"><i class="bi bi-check2-circle"></i> Bulk Verify & Send Winnings</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="msBulkPreviewBody"></div></div><div class="modal-footer border-glass"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn-premium px-4" id="msBulkConfirmBtn"><i class="bi bi-send-check-fill"></i> Confirm & Send Winnings</button></div></div></div></div>
 
-    <div class="modal fade" id="userScopeModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-primary font-monospace"><i class="bi bi-person-bounding-box me-2"></i> User Profile</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="row g-0 h-100"><div class="col-lg-4 p-4 border-end border-glass" style="background:rgba(0,0,0,0.15);"><div class="text-center mb-4"><img src="" id="usImg" width="100" class="rounded-circle mb-3 border border-primary p-1 bg-dark"><h4 class="fw-bold m-0 text-white" id="usNm">Name</h4><small class="text-info font-monospace d-block mb-1" id="usEm">email</small><small class="text-warning font-monospace d-block mb-1" id="usUname"></small><small class="text-white font-monospace d-block mb-3" id="usPhone"></small><div class="p-2 rounded mb-2 text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">UID: <span id="usUid" class="text-white"></span></div><div class="p-2 rounded text-start font-monospace small mb-2" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Referral Code: <span id="usRef" class="text-warning fw-bold"></span></div><div class="p-2 rounded text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Game ID: <span id="usGame" class="text-info fw-bold"></span></div></div><hr class="border-secondary"><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Deposit Balance</span><strong class="text-white fs-5 font-monospace"><span class="c-sym">₹</span><span id="usDp"></span></strong></div><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Winning Balance</span><strong class="text-success fs-5 font-monospace"><span class="c-sym">₹</span><span id="usWn"></span></strong></div><div class="d-flex justify-content-between mb-5 align-items-center"><span class="text-muted small fw-bold text-uppercase">Bonus Balance</span><strong class="text-warning fs-5 font-monospace"><span class="c-sym">₹</span><span id="usBn"></span></strong></div><button class="btn w-100 fw-bold py-3 text-uppercase border-2" id="usTgBtn" data-action="tg-ban"><i class="bi bi-shield-x"></i> Ban User Account</button></div><div class="col-lg-8 p-0 d-flex flex-column"><div class="p-3 border-bottom border-glass" style="background:rgba(0,0,0,0.2);"><ul class="nav nav-pills gap-2 flex-nowrap" style="overflow-x:auto;" role="tablist"><li class="nav-item"><button class="nav-link active fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabAdj">Edit Balance</button></li><li class="nav-item"><button class="nav-link fw-bold text-danger px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabPush">Push Notification</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabLog">Matches Played</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabTxn">Transaction Ledger</button></li></ul></div><div class="p-4 flex-grow-1 overflow-auto"><div class="tab-content"><div class="tab-pane fade show active" id="tabAdj"><form id="fmAdj"><input type="hidden" id="adId"><div class="row g-4 mb-4"><div class="col-md-6"><label class="form-label text-warning">Amount (Use negative to deduct)</label><input type="number" class="form-control form-control-lg fw-bold font-monospace" id="adV" required placeholder="e.g. 50 or -50"></div><div class="col-md-6"><label class="form-label text-warning">Target Wallet</label><select class="form-select form-select-lg" id="adT" required><option value="balance">Deposit Balance</option><option value="winningCash">Winning Balance</option><option value="bonusCash">Bonus Balance</option></select></div><div class="col-12"><label class="form-label text-warning">Reason for Update (Required)</label><input type="text" class="form-control" id="adR" required placeholder="Refund, penalty, reward..."></div></div><button type="submit" class="btn-premium w-100 py-3"><i class="bi bi-database-fill-exclamation"></i> Update Balance Now</button></form></div><div class="tab-pane fade" id="tabPush"><form id="fmPsh"><div class="mb-4"><label class="form-label text-danger">Saved Templates</label><div class="d-flex gap-2"><select class="form-select" id="psTplPick"><option value="">-- Load a saved template --</option></select><button type="button" class="btn btn-outline-secondary" data-action="save-tpl" data-src="ps" title="Save current title + message as a new template"><i class="bi bi-bookmark-plus"></i></button><button type="button" class="btn btn-outline-danger" data-action="del-tpl" data-src="ps" title="Delete selected template"><i class="bi bi-trash"></i></button></div></div><div class="mb-4"><label class="form-label text-danger">Notification Title</label><input type="text" class="form-control" id="psH" required></div><div class="mb-4"><label class="form-label text-danger">Message</label><textarea class="form-control" id="psM" rows="4" required></textarea></div><div class="mb-4"><label class="form-label text-muted">Image URL (Optional)</label><input type="url" class="form-control" id="psU"></div><button type="submit" class="btn-premium w-100 py-3" style="background:var(--danger);"><i class="bi bi-bell"></i> Send to this user</button></form></div><div class="tab-pane fade" id="tabLog"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Match Name</th><th>Status</th><th>Kills</th><th>Winnings (<span class="c-sym">₹</span>)</th></tr></thead><tbody id="tbUsrLog"></tbody></table></div></div><div class="tab-pane fade" id="tabTxn"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Date & Time</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead><tbody id="tbUsrTxn"></tbody></table></div></div></div></div></div></div></div></div></div>
+    <div class="modal fade" id="userScopeModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-primary font-monospace"><i class="bi bi-person-bounding-box me-2"></i> User Profile</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="row g-0 h-100"><div class="col-lg-4 p-4 border-end border-glass" style="background:rgba(0,0,0,0.15);"><div class="text-center mb-4"><img src="" id="usImg" width="100" class="rounded-circle mb-3 border border-primary p-1 bg-dark"><h4 class="fw-bold m-0 text-white" id="usNm">Name</h4><small class="text-info font-monospace d-block mb-1" id="usEm">email</small><small class="text-warning font-monospace d-block mb-1" id="usUname"></small><small class="text-white font-monospace d-block mb-3" id="usPhone"></small><div class="p-2 rounded mb-2 text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">UID: <span id="usUid" class="text-white"></span></div><div class="p-2 rounded text-start font-monospace small mb-2" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Referral Code: <span id="usRef" class="text-warning fw-bold"></span></div><div class="p-2 rounded text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Game ID: <span id="usGame" class="text-info fw-bold"></span></div></div><hr class="border-secondary"><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Deposit Balance</span><strong class="text-white fs-5 font-monospace"><span class="c-sym">₹</span><span id="usDp"></span></strong></div><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Winning Balance</span><strong class="text-success fs-5 font-monospace"><span class="c-sym">₹</span><span id="usWn"></span></strong></div><div class="d-flex justify-content-between mb-5 align-items-center"><span class="text-muted small fw-bold text-uppercase">Bonus Balance</span><strong class="text-warning fs-5 font-monospace"><span class="c-sym">₹</span><span id="usBn"></span></strong></div><button class="btn w-100 fw-bold py-3 text-uppercase border-2" id="usTgBtn" data-action="tg-ban"><i class="bi bi-shield-x"></i> Ban User Account</button></div><div class="col-lg-8 p-0 d-flex flex-column"><div class="p-3 border-bottom border-glass" style="background:rgba(0,0,0,0.2);"><ul class="nav nav-pills gap-2 flex-nowrap" style="overflow-x:auto;" role="tablist"><li class="nav-item"><button class="nav-link active fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabAdj">Edit Balance</button></li><li class="nav-item"><button class="nav-link fw-bold text-danger px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabPush">Push Notification</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabLog">Matches Played</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabTxn">Transaction Ledger</button></li></ul></div><div class="p-4 flex-grow-1 overflow-auto"><div class="tab-content"><div class="tab-pane fade show active" id="tabAdj"><form id="fmAdj"><input type="hidden" id="adId"><div class="row g-4 mb-4"><div class="col-md-6"><label class="form-label text-warning">Amount (Use negative to deduct)</label><input type="number" class="form-control form-control-lg fw-bold font-monospace" id="adV" required placeholder="e.g. 50 or -50"></div><div class="col-md-6"><label class="form-label text-warning">Target Wallet</label><select class="form-select form-select-lg" id="adT" required><option value="balance">Deposit Balance</option><option value="winningCash">Winning Balance</option><option value="bonusCash">Bonus Balance</option></select></div><div class="col-12"><label class="form-label text-warning">Reason for Update (Required)</label><input type="text" class="form-control" id="adR" required placeholder="Refund, penalty, reward..."></div></div><button type="submit" class="btn-premium w-100 py-3"><i class="bi bi-database-fill-exclamation"></i> Update Balance Now</button></form></div><div class="tab-pane fade" id="tabPush"><form id="fmPsh"><div class="mb-4"><label class="form-label text-danger">Saved Templates</label><div class="d-flex gap-2"><select class="form-select" id="psTplPick"><option value="">-- Load a saved template --</option></select><button type="button" class="btn btn-outline-secondary" data-action="save-tpl" data-src="ps" title="Save current title + message as a new template"><i class="bi bi-bookmark-plus"></i></button><button type="button" class="btn btn-outline-danger" data-action="del-tpl" data-src="ps" title="Delete selected template"><i class="bi bi-trash"></i></button></div></div><div class="mb-4"><label class="form-label text-danger">Notification Title</label><input type="text" class="form-control" id="psH" required></div><div class="mb-4"><label class="form-label text-danger">Message</label><textarea class="form-control" id="psM" rows="4" required></textarea></div><div class="mb-4"><label class="form-label text-muted">Image URL (Optional)</label><input type="url" class="form-control" id="psU"></div><button type="submit" class="btn-premium w-100 py-3" style="background:var(--danger);"><i class="bi bi-bell"></i> Send to this user</button></form></div><div class="tab-pane fade" id="tabLog"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Match Name</th><th>Status</th><th>Kills</th><th>Winnings (<span class="c-sym">₹</span>)</th></tr></thead><tbody id="tbUsrLog"></tbody></table></div></div><div class="tab-pane fade" id="tabTxn"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Date & Time</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead><tbody id="tbUsrTxn"></tbody></table></div></div></div></div></div></div></div></div></div></div>
     <div class="modal fade" id="userCreateModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-primary font-monospace">Add New User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="fmUsCr"><div class="mb-3"><label class="form-label text-primary">Full Name</label><input type="text" class="form-control" id="ucN" required></div><div class="mb-3"><label class="form-label text-primary">Email Address</label><input type="email" class="form-control" id="ucE" required></div><div class="mb-3"><label class="form-label text-primary">Password</label><input type="password" class="form-control" id="ucP" required minlength="6"></div><div class="mb-4"><label class="form-label text-primary">Add Starting Balance (<span class="c-sym">₹</span>)</label><input type="number" class="form-control fw-bold font-monospace" id="ucC" value="0"></div><button type="submit" class="btn-premium w-100 py-3">Create Account</button></form></div></div></div></div>
 
     <div class="modal fade" id="regPModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass" style="background:rgba(0,0,0,0.4);"><h5 class="modal-title fw-bold text-success font-monospace">Participants: <span id="rpTi" class="text-white"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="table-responsive"><table class="table table-glass mb-0" id="tbRpEx"><thead><tr><th>User Details</th><th>In-Game Details</th><th>Room Slot</th><th>Kills</th><th>Rank</th><th>Action</th></tr></thead><tbody id="tbRpL"></tbody></table></div></div>
@@ -1516,6 +1574,10 @@
          as the reward/payout notifications, so it's picked up by the existing pushOnHostNotification
          Cloud Function trigger with no changes there. -->
     <div class="modal fade" id="hostPushModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-warning"><div class="modal-header border-warning" style="background:rgba(245,158,11,0.1);"><h5 class="modal-title fw-bold text-warning font-monospace"><i class="bi bi-bell-fill"></i> Notify: <span id="hpHostName" class="text-white"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="fmHostPush"><input type="hidden" id="hpUid"><div class="mb-3"><label class="form-label">Notification Title</label><input type="text" class="form-control" id="hpTitle" required></div><div class="mb-4"><label class="form-label">Message</label><textarea class="form-control" id="hpMsg" rows="4" required></textarea></div><button type="submit" class="btn btn-outline-warning w-100 py-3 fw-bold"><i class="bi bi-send-fill"></i> Send to this Host</button></form></div></div></div></div>
+    <!-- Manual Host Wallet control (Host Management > Adjust Wallet), the host-side analog of the
+         User modal's "Edit Balance" tab -- see POST /hosts/:id/adjust-balance. CF-only (no Firebase
+         Cloud Function sibling exists), so this only appears once RX_HO_CF is live. -->
+    <div class="modal fade" id="hostWalletModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-success"><div class="modal-header border-success" style="background:rgba(16,185,129,0.1);"><h5 class="modal-title fw-bold text-success font-monospace"><i class="bi bi-wallet2"></i> Adjust Wallet: <span id="hwHostName" class="text-white"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="d-flex justify-content-between align-items-center mb-4 p-3 rounded" style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass);"><span class="text-muted small fw-bold text-uppercase">Current Balance</span><strong class="text-success fs-4 font-monospace"><span class="c-sym">₹</span><span id="hwCurrentBal">0</span></strong></div><form id="fmHostWalletAdj"><input type="hidden" id="hwUid"><div class="mb-3"><label class="form-label text-success">Amount (Use negative to deduct)</label><input type="number" class="form-control form-control-lg fw-bold font-monospace" id="hwAmt" required placeholder="e.g. 50 or -50"></div><div class="mb-4"><label class="form-label text-success">Reason for Update (Required)</label><input type="text" class="form-control" id="hwReason" required placeholder="Correction, off-platform payout, bonus..."></div><button type="submit" class="btn-premium w-100 py-3"><i class="bi bi-database-fill-exclamation"></i> Update Wallet Now</button></form></div></div></div></div>
     <!-- CORE EXECUTION ENGINE -->
     <script type="module">
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
@@ -1774,7 +1836,7 @@
                 else if(s==='withdrawals-section') r=['wd_appr']; else if(s==='deposit-section' || s==='zapupi-status-section') r=['dep_appr'];
                 else if(s==='users-section') r=['user_mgt']; else if(s==='tutorials-section' || s==='support-manager-section' || s==='support-chat-section' || s==='language-section') r=['sup_mgt'];
                 else if(s==='notifications-section') r=['notif_mgt']; else if(s==='theme-section') r=['theme_mgt'];
-                else if(s==='settings-section') r=['sys_set', 'currency_mgt']; else if(s==='staff-management-section') r=['staff_mgt'];
+                else if(s==='settings-section') r=['sys_set', 'currency_mgt']; else if(s==='smart-activity-section') r=['sys_set']; else if(s==='staff-management-section') r=['staff_mgt'];
                 else if(s==='hosts-section') r=['staff_mgt','host_mgt'];
                 else if(s==='staff-logs-section') r=['staff_logs']; else if(s==='match-logs-section') r=['match_logs', 'match_edit'];
                 if(r && !r.some(x=>C_P.includes(x))) p.style.display='none'; else p.style.display='block';
@@ -1796,7 +1858,7 @@
             else if(id==='withdrawals-section') r=['wd_appr']; else if(id==='deposit-section' || id==='zapupi-status-section') r=['dep_appr'];
             else if(id==='users-section') r=['user_mgt']; else if(id==='tutorials-section' || id==='support-manager-section' || id==='support-chat-section' || id==='language-section') r=['sup_mgt'];
             else if(id==='notifications-section') r=['notif_mgt']; else if(id==='theme-section') r=['theme_mgt'];
-            else if(id==='settings-section') r=['sys_set', 'currency_mgt']; else if(id==='staff-management-section') r=['staff_mgt']; else if(id==='hosts-section') r=['staff_mgt','host_mgt'];
+            else if(id==='settings-section') r=['sys_set', 'currency_mgt']; else if(id==='smart-activity-section') r=['sys_set']; else if(id==='staff-management-section') r=['staff_mgt']; else if(id==='hosts-section') r=['staff_mgt','host_mgt'];
             else if(id==='staff-logs-section') r=['staff_logs']; else if(id==='match-logs-section') r=['match_logs', 'match_edit'];
 
             if(r && !r.some(x=>C_P.includes('all') || C_P.includes(x)) && window.C_ROLE !== 'Host') return TS('Access Denied. Insufficient Privileges.', 'error');
@@ -2070,6 +2132,7 @@
                 else if(id==='tournaments-section') { if(CF_LIVE) await RX_TR_CF(); else await RX_TR(); }
                 else if(id==='tournament-management-section') { if(CF_LIVE) await RX_TM_CF(); else await RX_TM(); }
                 else if(id==='match-scheduler-section') { if(CF_LIVE) await RX_MS_CF(); else await RX_MS(); }
+                else if(id==='smart-activity-section') await RX_SMA_CF();
                 else if(id==='leaderboard-mgt-section') { if(CF_LIVE) await RX_LB_CF(); else { if(!PAGE_CACHE['users']) E('tbRanks').innerHTML=PHO(3); const s=await fetchWithCache('users'); UC={}; if(s.exists()) s.forEach(c => {UC[c.key]=c.val();}); await RX_LB(); } }
                 else if(id==='users-section') { if(CF_LIVE) await RX_US_CF(); else { if(!PAGE_CACHE['users']) E('tbUsers').innerHTML=PHO(5); const s=await fetchWithCache('users'); UC={}; if(s.exists()) s.forEach(c => {UC[c.key]=c.val();}); await R_US(); } }
                 else if(id==='user-analytics-section') { if(CF_LIVE) await RX_UA_CF(); else await RX_UA(); }
@@ -2361,7 +2424,7 @@
         };
 
         const RX_SS = async () => {
-            E('cfName').value=SET.appName||''; E('cfLogo').value=SET.logoUrl||''; E('cfZpKey').value=SET.payment?.zap_key||''; E('cfZpTog').checked=!!SET.payment?.gateway_enabled; E('cfZpMin').value=SET.payment?.min_deposit||0; E('cfZpMax').value=SET.payment?.max_deposit||0; E('cfWdMin').value=SET.minWithdraw||0; E('cfUpId').value=SET.upiDetails||''; E('cfUpQr').value=SET.qrCodeUrl||''; E('cfPriv').value=SET.policyPrivacy||''; E('cfTrm').value=SET.policyTerms||''; E('cfRef').value=SET.policyRefund||''; E('cfFair').value=SET.policyFairPlay||'';
+            E('cfName').value=SET.appName||''; E('cfLogo').value=SET.logoUrl||''; E('cfZpKey').value=SET.payment?.zap_key||''; E('cfZpTog').checked=!!SET.payment?.gateway_enabled; E('cfZpMin').value=SET.payment?.min_deposit||0; E('cfZpMax').value=SET.payment?.max_deposit||0; E('cfWdMin').value=SET.minWithdraw||0; E('cfUpId').value=SET.upiDetails||''; E('cfUpQr').value=SET.qrCodeUrl||''; E('cfMdTog').checked = SET.manual_deposit_enabled!==false; E('cfPriv').value=SET.policyPrivacy||''; E('cfTrm').value=SET.policyTerms||''; E('cfRef').value=SET.policyRefund||''; E('cfFair').value=SET.policyFairPlay||'';
             E('visWallet').checked = SET.walletEnabled!==false; E('visLeaderboard').checked = SET.leaderboardEnabled!==false; E('visReferral').checked = SET.referralEnabled!==false; E('visSupport').checked = SET.supportEnabled!==false; E('visEarnings').checked = SET.earningsEnabled!==false; E('visTutorials').checked = SET.tutorialsEnabled!==false;
             E('currImgU').value = SET.currencyImage || '';
             if(SET.currencyImage) E('currImgPreview').innerHTML = `<img src="${SET.currencyImage}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">`; else E('currImgPreview').innerHTML = '<span class="fs-1 text-muted c-sym">₹</span>';
@@ -2393,7 +2456,7 @@
             E('cfName').value=s.appName||''; E('cfLogo').value=s.logoUrl||'';
             E('cfZpKey').value = s.zapKeyPresent ? '•••• (key present -- rotate via wrangler CLI, not this panel yet)' : '';
             E('cfZpTog').checked=!!s.gateway_enabled; E('cfZpMin').value=s.min_deposit||0; E('cfZpMax').value=s.max_deposit||0;
-            E('cfWdMin').value=s.minWithdraw||0; E('cfUpId').value=s.upiDetails||''; E('cfUpQr').value=s.qrCodeUrl||'';
+            E('cfWdMin').value=s.minWithdraw||0; E('cfUpId').value=s.upiDetails||''; E('cfUpQr').value=s.qrCodeUrl||''; E('cfMdTog').checked = s.manual_deposit_enabled!==false;
             E('cfPriv').value=s.policyPrivacy||''; E('cfTrm').value=s.policyTerms||''; E('cfRef').value=s.policyRefund||''; E('cfFair').value=s.policyFairPlay||'';
             E('visWallet').checked = s.walletEnabled!==false; E('visLeaderboard').checked = s.leaderboardEnabled!==false; E('visReferral').checked = s.referralEnabled!==false; E('visSupport').checked = s.supportEnabled!==false; E('visEarnings').checked = s.earningsEnabled!==false; E('visTutorials').checked = s.tutorialsEnabled!==false;
             E('currImgU').value = s.currencyImage || '';
@@ -2423,10 +2486,10 @@
         E('masterConfigForm').onsubmit = e => { e.preventDefault(); A_EX(async () => {
             if(!CHK_P('sys_set')) return TS('Unauthorized','error');
             if(CF_LIVE) {
-                await saveSettingsCF({appName:E('cfName').value, logoUrl:E('cfLogo').value, minWithdraw:Number(E('cfWdMin').value), upiDetails:E('cfUpId').value, qrCodeUrl:E('cfUpQr').value, policyPrivacy:E('cfPriv').value, policyTerms:E('cfTrm').value, policyRefund:E('cfRef').value, policyFairPlay:E('cfFair').value, walletEnabled:E('visWallet').checked, leaderboardEnabled:E('visLeaderboard').checked, referralEnabled:E('visReferral').checked, supportEnabled:E('visSupport').checked, earningsEnabled:E('visEarnings').checked, tutorialsEnabled:E('visTutorials').checked, gateway_enabled: E('cfZpTog').checked, min_deposit: Number(E('cfZpMin').value), max_deposit: Number(E('cfZpMax').value)});
+                await saveSettingsCF({appName:E('cfName').value, logoUrl:E('cfLogo').value, minWithdraw:Number(E('cfWdMin').value), upiDetails:E('cfUpId').value, qrCodeUrl:E('cfUpQr').value, manual_deposit_enabled: E('cfMdTog').checked, policyPrivacy:E('cfPriv').value, policyTerms:E('cfTrm').value, policyRefund:E('cfRef').value, policyFairPlay:E('cfFair').value, walletEnabled:E('visWallet').checked, leaderboardEnabled:E('visLeaderboard').checked, referralEnabled:E('visReferral').checked, supportEnabled:E('visSupport').checked, earningsEnabled:E('visEarnings').checked, tutorialsEnabled:E('visTutorials').checked, gateway_enabled: E('cfZpTog').checked, min_deposit: Number(E('cfZpMin').value), max_deposit: Number(E('cfZpMax').value)});
                 LOG_ACT('staff', 'Updated System Settings', ''); TS('App Settings Saved'); await RX_SS_CF();
             } else {
-                await update(ref(rd, 'settings'), {appName:E('cfName').value, logoUrl:E('cfLogo').value, minWithdraw:Number(E('cfWdMin').value), upiDetails:E('cfUpId').value, qrCodeUrl:E('cfUpQr').value, policyPrivacy:E('cfPriv').value, policyTerms:E('cfTrm').value, policyRefund:E('cfRef').value, policyFairPlay:E('cfFair').value, walletEnabled:E('visWallet').checked, leaderboardEnabled:E('visLeaderboard').checked, referralEnabled:E('visReferral').checked, supportEnabled:E('visSupport').checked, earningsEnabled:E('visEarnings').checked, tutorialsEnabled:E('visTutorials').checked, updatedAt: Date.now()});
+                await update(ref(rd, 'settings'), {appName:E('cfName').value, logoUrl:E('cfLogo').value, minWithdraw:Number(E('cfWdMin').value), upiDetails:E('cfUpId').value, qrCodeUrl:E('cfUpQr').value, manual_deposit_enabled: E('cfMdTog').checked, policyPrivacy:E('cfPriv').value, policyTerms:E('cfTrm').value, policyRefund:E('cfRef').value, policyFairPlay:E('cfFair').value, walletEnabled:E('visWallet').checked, leaderboardEnabled:E('visLeaderboard').checked, referralEnabled:E('visReferral').checked, supportEnabled:E('visSupport').checked, earningsEnabled:E('visEarnings').checked, tutorialsEnabled:E('visTutorials').checked, updatedAt: Date.now()});
                 await update(ref(rd, 'paymentGatewayConfig'), {zap_key: E('cfZpKey').value, gateway_enabled: E('cfZpTog').checked, min_deposit: Number(E('cfZpMin').value), max_deposit: Number(E('cfZpMax').value)});
                 LOG_ACT('staff', 'Updated System Settings', ''); CLR_CACHE('settings'); CLR_CACHE('paymentGatewayConfig'); TS('App Settings Saved');
             }
@@ -2436,6 +2499,82 @@
         E('currImgU').oninput = (e) => { if(e.target.value && !E('currImgF').files[0]) { E('currImgPreview').innerHTML = `<img src="${e.target.value}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML='<span class=\\'fs-1 text-muted c-sym\\'>₹</span>'">`; } else if (!e.target.value && !E('currImgF').files[0]) { E('currImgPreview').innerHTML = '<span class="fs-1 text-muted c-sym">₹</span>'; ApplyCurrencySymbol(); } };
 
         E('fmCurrency').onsubmit = e => { e.preventDefault(); A_EX(async () => { if(!CHK_P('sys_set') && !CHK_P('currency_mgt')) return TS('Unauthorized','error'); let u = E('currImgU').value; if(E('currImgF').files[0]) u = await P_IMG(E('currImgF').files[0]); if(CF_LIVE) { await saveSettingsCF({currencyImage: u}); LOG_ACT('staff', 'Updated Currency Image', ''); TS('Currency Image Saved'); ApplyCurrencySymbol(); await RX_SS_CF(); } else { await update(ref(rd, 'settings'), {currencyImage: u}); SET.currencyImage = u; LOG_ACT('staff', 'Updated Currency Image', ''); CLR_CACHE('settings'); TS('Currency Image Saved'); ApplyCurrencySymbol(); await RX_SS(); } }, e.submitter || e.target.querySelector('button[type="submit"]')); };
+
+        /* Smart Match Activity (CF-only -- no Firebase Cloud Function equivalent exists, matches
+         * already come from the Worker's /matches regardless of CF_LIVE). Renders honest mode
+         * checkboxes from the real MC modes cache and reads/writes the flat settings keys the
+         * Worker's applySmartActivityBadges() consumes -- see E:\playx24-api\src\domain\smartActivity.ts. */
+        const smaRenderModeCheckboxes = (containerId, modes, selectedIds) => {
+            const el = E(containerId); if (!el) return;
+            if (!modes.length) { el.innerHTML = '<span class="text-muted small">No active modes found. Add modes under Modes Management first.</span>'; return; }
+            el.innerHTML = modes.map(m => `
+                <div class="form-check">
+                    <input class="form-check-input sma-mode-cb" type="checkbox" value="${m.id}" id="${containerId}_${m.id}" ${selectedIds.includes(m.id) ? 'checked' : ''}>
+                    <label class="form-check-label" for="${containerId}_${m.id}">${m.name}${m.gameName ? ` <small class="text-muted">(${m.gameName})</small>` : ''}</label>
+                </div>`).join('');
+        };
+
+        const smaLoadStatus = async () => {
+            if (!E('smaStatusBlock')) return;
+            E('smaStatusBlock').innerHTML = '<div class="col-12 text-muted">Loading...</div>';
+            try {
+                const st = await CF.get('admin/smart-activity');
+                const cat = (title, c) => `
+                    <div class="col-md-6">
+                        <div class="p-3 rounded" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold m-0">${title}</h6>
+                                <span class="badge ${c.enabled ? 'bg-success' : 'bg-secondary'}">${c.enabled ? 'ON' : 'OFF'}</span>
+                            </div>
+                            <div class="d-flex justify-content-between"><span class="text-muted">Real players waiting</span><b>${c.realPlayersWaiting}</b></div>
+                            <div class="d-flex justify-content-between"><span class="text-muted">Featured (0 real players yet)</span><b>${c.featuredMatches}</b></div>
+                            <div class="d-flex justify-content-between"><span class="text-muted">Highlighted (real player already waiting)</span><b>${c.waitingMatches}</b></div>
+                        </div>
+                    </div>`;
+                let html = cat('2-Slot Matches', st.twoSlot) + cat('Multi-Slot Matches', st.multiSlot);
+                if (st.matches && st.matches.length) {
+                    html += `<div class="col-12"><div class="table-responsive mt-2"><table class="table table-glass table-sm mb-0">
+                        <thead><tr><th>Match</th><th>Mode</th><th>Slots</th><th>Real Players</th><th>Status</th></tr></thead>
+                        <tbody>${st.matches.map(m => `<tr><td>${m.name || m.id}</td><td>${m.modeName || m.modeId}</td><td>${m.registeredCount}/${m.totalSlots}</td><td>${m.registeredCount}</td><td><span class="badge ${m.activityBadge === 'featured' ? 'bg-warning text-dark' : 'bg-info'}">${m.activityBadge === 'featured' ? 'Featured' : 'Player waiting'}</span></td></tr>`).join('')}</tbody>
+                    </table></div></div>`;
+                } else {
+                    html += '<div class="col-12 text-muted mt-2">No matches currently highlighted.</div>';
+                }
+                E('smaStatusBlock').innerHTML = html;
+            } catch (e) {
+                E('smaStatusBlock').innerHTML = `<div class="col-12 text-danger">Failed to load status: ${e.message}</div>`;
+            }
+        };
+
+        const RX_SMA_CF = async () => {
+            if (!Object.keys(MC).length) { try { const m = await CF.get('modes'); (m.modes || []).forEach(x => { MC[x.id] = x; }); } catch (e) {} }
+            const modes = Object.values(MC).filter(m => m.status !== 'inactive').sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            const s = await CF.get('settings');
+            E('sma2Toggle').checked = s.smartActivity2SlotEnabled === true;
+            E('smaMultiToggle').checked = s.smartActivityMultiSlotEnabled === true;
+            E('smaMaxFeatured').value = s.smartActivityMaxFeatured || 5;
+            smaRenderModeCheckboxes('sma2Modes', modes, Array.isArray(s.smartActivity2SlotModes) ? s.smartActivity2SlotModes : []);
+            smaRenderModeCheckboxes('smaMultiModes', modes, Array.isArray(s.smartActivityMultiSlotModes) ? s.smartActivityMultiSlotModes : []);
+            await smaLoadStatus();
+        };
+
+        if (E('smaRefreshBtn')) E('smaRefreshBtn').onclick = () => A_EX(smaLoadStatus);
+
+        if (E('smaForm')) E('smaForm').onsubmit = e => { e.preventDefault(); A_EX(async () => {
+            if (!CHK_P('sys_set')) return TS('Unauthorized', 'error');
+            const twoSlotModes = [...document.querySelectorAll('#sma2Modes .sma-mode-cb:checked')].map(el => el.value);
+            const multiSlotModes = [...document.querySelectorAll('#smaMultiModes .sma-mode-cb:checked')].map(el => el.value);
+            await saveSettingsCF({
+                smartActivity2SlotEnabled: E('sma2Toggle').checked,
+                smartActivity2SlotModes: twoSlotModes,
+                smartActivityMultiSlotEnabled: E('smaMultiToggle').checked,
+                smartActivityMultiSlotModes: multiSlotModes,
+                smartActivityMaxFeatured: Number(E('smaMaxFeatured').value) || 5,
+            });
+            LOG_ACT('staff', 'Updated Smart Match Activity Settings', '');
+            TS('Smart Match Activity settings saved');
+            await smaLoadStatus();
+        }, e.submitter || e.target.querySelector('button[type="submit"]')); };
 
         const RX_TH = async () => {
             const ts = await fetchWithCache('themeSettings');
@@ -5098,6 +5237,18 @@
         E('fmPsh').onsubmit = e => { e.preventDefault(); A_EX(async () => { if(!CHK_P('notif_mgt')) return TS('Unauthorized','error'); await SendNotifCF(E('adId').value, E('psH').value, E('psM').value, "info"); LOG_ACT('staff','Sent Individual Push', `UID: ${E('adId').value}`); TS('Notification Sent'); E('fmPsh').reset(); }, e.submitter || e.target.querySelector('button[type="submit"]')); };
         E('fmHostPush').onsubmit = e => { e.preventDefault(); A_EX(async () => { if(!CHK_P('notif_mgt')) return TS('Unauthorized','error'); const uid = E('hpUid').value; if(CF_LIVE) await SendHostNotifCF(uid, E('hpTitle').value, E('hpMsg').value, 'info'); else await SendHostNotif(uid, E('hpTitle').value, E('hpMsg').value, 'info'); LOG_ACT('staff','Sent Host Push', `UID: ${uid}`); TS('Notification Sent'); E('fmHostPush').reset(); ML['hostPushModal'].hide(); }, e.submitter || e.target.querySelector('button[type="submit"]')); };
 
+        E('fmHostWalletAdj').onsubmit = e => { e.preventDefault(); A_EX(async () => {
+            if(!CHK_P('host_mgt')) return TS('Unauthorized','error');
+            const uid = E('hwUid').value;
+            const amountRupees = E('hwAmt').value;
+            const res = await adjustHostWalletCF(uid, rupeesToPaiseCF(amountRupees), E('hwReason').value);
+            LOG_ACT('staff', 'Adjusted Host Wallet', `UID: ${uid}, Amount: ${amountRupees}, Reason: ${E('hwReason').value}`);
+            TS('Host Wallet Updated');
+            E('hwCurrentBal').textContent = P2R(res.balanceAfter || 0).toFixed(2);
+            E('fmHostWalletAdj').reset();
+            await RX_HO_CF();
+        }, e.submitter || e.target.querySelector('button[type="submit"]')); };
+
         // Bandwidth fix 2026-07-20 (optimization plan #3): top spenders / most active used to be
         // computed by downloading `deposits` and `tournaments` IN FULL, every time this section
         // opened — the two largest collections in the database, just to find 5 names each. Neither
@@ -5930,6 +6081,12 @@
          * RX_HO_CF/RX_ST_CF's data-id attributes), "notif_mgt". */
         const SendHostNotifCF = async (uid, title, msg, type) => { if(!uid) return; await sendNotificationCF({userId: uid, audience: 'host', title, message: msg, type: type||'info'}); };
 
+        /* Manual Host wallet control -- POST /hosts/:id/adjust-balance, the host-side analog of
+         * adjustBalanceCF. amountPaise is signed (positive credits, negative debits); the Worker
+         * clamps at 0 rather than going negative or rejecting an over-large debit. CF-only, no
+         * Firebase Cloud Function sibling. */
+        const adjustHostWalletCF = (hostId, amountPaise, reason) => CF.post(`hosts/${hostId}/adjust-balance`, { amount: amountPaise, reason });
+
         // v5 FEATURE (point 9): self-healing sweep for host rewards. The inline
         // auto-approve/auto-cancel (wired into execute-computations,
         // execute-lonewolf-computation, and the cancellation paths) should already
@@ -6096,6 +6253,7 @@
                     const matchCount = host.matchesHosted || hostMatches.filter(m=>m.status==='completed').length;
                     const statusBadge = host.status === 'active' ? 'badge-success' : (host.status === 'banned' ? 'badge-danger' : 'badge-warning');
                     let actionBtns = `<button class="btn btn-sm btn-outline-primary py-1" data-action="e-st" data-id="${host.userId}" title="Edit Host"><i class="bi bi-pencil"></i></button>`;
+                    actionBtns += `<button class="btn btn-sm btn-outline-success py-1" data-action="adj-host-wallet" data-id="${host.userId}" data-name="${ESC(host.name)}" data-bal="${host.walletBalance||0}" title="Adjust Wallet"><i class="bi bi-wallet2"></i></button>`;
                     const hostNameJs = (host.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
                     actionBtns += `<button class="btn btn-sm btn-outline-info py-1" onclick='openHostMatches(${JSON.stringify(hostMatches).replace(/'/g, "&apos;")}, "${hostNameJs}")' title="View Matches"><i class="bi bi-eye-fill"></i></button>`;
                     actionBtns += `<button class="btn btn-sm btn-outline-warning py-1" data-action="notify-host" data-id="${host.userId}" data-name="${ESC(host.name)}" title="Send Notification"><i class="bi bi-bell-fill"></i></button>`;
@@ -6152,7 +6310,15 @@
                 </tr>`;
             });
             E('tbHostMatches').innerHTML = h || `<tr><td colspan="3" class="text-center text-muted py-4">No matches hosted yet.</td></tr>`;
-            new bootstrap.Modal(document.getElementById('hostMatchesModal')).show();
+            /* Was `new bootstrap.Modal(...).show()` -- a fresh instance every click instead of the
+             * one already registered in ML at page load (every other modal in the panel reuses
+             * ML[id]). Bootstrap doesn't dispose the old instance when a new one is constructed on
+             * the same element; if the modal wasn't cleanly closed since the last "View Matches"
+             * click, the new instance has no idea a backdrop is already sitting there and layers
+             * another on top, with the two instances' internal _isShown/_backdrop state now out of
+             * sync -- the concrete, reproducible cause of "View Matches" going dark with nothing
+             * visible. Reusing ML's singleton instance matches every other modal in this file. */
+            SHOW_MODAL_CLEAN('hostMatchesModal');
         };
 
         if(E('staffSearch') && E('staffFilterRole') && E('staffFilterStatus')) {
@@ -6203,6 +6369,71 @@
 
         if(E('staffLogSearch')) { E('staffLogSearch').oninput = e => { const tm = e.target.value.toLowerCase(); E('tbStaffLogs').querySelectorAll('tr').forEach(r => { r.style.display = r.innerText.toLowerCase().includes(tm) ? '' : 'none'; }); }; }
         if(E('staffLogFilter')) { E('staffLogFilter').onchange = e => { const val = e.target.value; const now = Date.now(); E('tbStaffLogs').querySelectorAll('tr').forEach(r => { const ts = Number(r.dataset.ts || 0); let show = true; if(val === 'today') show = (now - ts) <= 86400000; else if(val === '7days') show = (now - ts) <= 604800000; else if(val === '30days') show = (now - ts) <= 2592000000; const tm = E('staffLogSearch').value.toLowerCase(); if(show && tm) show = r.innerText.toLowerCase().includes(tm); r.style.display = show ? '' : 'none'; }); }; }
+
+        /* Self-heals the "whole panel goes dull, only a refresh fixes it" bug: a modal action that
+         * errors/rejects AFTER bootstrap.Modal has already inserted its backdrop (backdrop insertion
+         * happens synchronously inside .show(); the toggling of the modal's own 'show' class happens
+         * later, after a transition callback -- confirmed directly: right after calling .show(), the
+         * modal element is still display:none for roughly Bootstrap's default 150-300ms transition
+         * duration) leaves that backdrop orphaned forever if the modal itself never actually opens on
+         * that pass -- no code path exists to remove it.
+         *
+         * MUST run on a delay, not synchronously at click time: checking immediately races a modal
+         * that's legitimately mid-open from THIS SAME click (or a fast second click fired while the
+         * first is still transitioning in) -- .modal.show isn't present yet either way, so a
+         * synchronous check can't tell "stuck" apart from "just started" and will rip out a backdrop
+         * that was about to become a real, working modal. 600ms comfortably clears the transition
+         * window while still self-healing well within a second of the click that revealed the
+         * problem, instead of requiring a hard refresh. */
+        const clearAllModalChrome = () => {
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        };
+
+        const CLEAN_ORPHAN_MODAL_BACKDROPS = () => {
+            // A modal only counts as "legitimately open" if it's BOTH .show AND actually rendered.
+            // The original version bailed out on the class alone -- if an earlier interrupted open
+            // left some OTHER modal with a stuck .show class but never actually displayed, this
+            // treated every backdrop on the page as spoken-for and refused to clean up ANY of them,
+            // including one from a totally unrelated, genuinely orphaned attempt. Checking computed
+            // display closes that gap without changing behavior for a modal that's really open.
+            const anyVisiblyOpen = [...document.querySelectorAll('.modal.show')].some(m => getComputedStyle(m).display !== 'none');
+            if (anyVisiblyOpen) return;
+            clearAllModalChrome();
+        };
+
+        /** Call instead of ML[id].show() for a modal that's had trouble. Directly confirmed the
+         *  real failure mode: bootstrap.Modal.show() checks its OWN internal _isShown flag and
+         *  silently no-ops if it thinks the modal is already open -- and clearAllModalChrome (or
+         *  any DOM manipulation that isn't a proper .hide()) strips the visible .show class/backdrop
+         *  WITHOUT clearing that internal flag, so the DOM looks closed while the instance still
+         *  believes it's open. Every later .show() on that same instance then does nothing at all --
+         *  no error, no backdrop, no modal -- exactly the "click runs clean, nothing ever appears"
+         *  symptom reproduced live. Disposing and recreating the instance every time sidesteps the
+         *  whole problem: there is no stale internal state left to get out of sync with the DOM,
+         *  regardless of how a prior attempt failed. */
+        const SHOW_MODAL_CLEAN = (id) => {
+            const el = document.getElementById(id);
+            const existing = bootstrap.Modal.getInstance(el);
+            if (existing) existing.dispose();
+            clearAllModalChrome();
+            ML[id] = new bootstrap.Modal(el);
+            ML[id].show();
+        };
+
+        /* Runs on EVERY click anywhere on the page, unconditionally -- NOT nested inside the
+         * data-action listener below. An orphaned backdrop is a position:fixed, inset:0 element
+         * sitting on top of the entire page, so it physically intercepts a click before that click
+         * ever reaches a data-action button underneath it (Bootstrap backdrops start at opacity:0
+         * before fading to .5, so a backdrop caught mid-transition is completely invisible yet still
+         * blocks every click). Nesting the cleanup inside "only after finding a data-action element"
+         * meant it could never run at all once a stuck backdrop was blocking clicks -- the exact
+         * deadlock ("whole site unclickable, only a refresh works") this exists to prevent. A plain
+         * click anywhere, including directly on the stuck backdrop itself, now clears it ~600ms
+         * later, after which the next real click reaches its actual target normally. */
+        document.addEventListener('click', () => { setTimeout(CLEAN_ORPHAN_MODAL_BACKDROPS, 600); }, true);
 
         document.body.addEventListener('click', e => {
             const b = e.target.closest('[data-action]'); if(!b) return;
@@ -6351,6 +6582,7 @@
                 if(a==='susp-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(CF_LIVE) { await updateStaffCF(id, {status: 'suspended'}); LOG_ACT('staff','Suspended Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Suspended'); await RX_ST_CF(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO_CF(); } else { await update(ref(rd,`staff/${id}`), {status: 'suspended'}); LOG_ACT('staff','Suspended Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Suspended'); await RX_ST(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO(); } }
                 if(a==='act-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(CF_LIVE) { await updateStaffCF(id, {status: 'active'}); LOG_ACT('staff','Activated Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Activated'); await RX_ST_CF(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO_CF(); } else { await update(ref(rd,`staff/${id}`), {status: 'active'}); LOG_ACT('staff','Activated Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Activated'); await RX_ST(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO(); } }
                 if(a==='notify-host'){ if(!CHK_P('notif_mgt')) return TS('Unauthorized','error'); E('fmHostPush').reset(); E('hpUid').value = id; E('hpHostName').textContent = b.dataset.name || 'Host'; ML['hostPushModal'].show(); }
+                if(a==='adj-host-wallet'){ if(!CHK_P('host_mgt')) return TS('Unauthorized','error'); E('fmHostWalletAdj').reset(); E('hwUid').value = id; E('hwHostName').textContent = b.dataset.name || 'Host'; E('hwCurrentBal').textContent = P2R(Number(b.dataset.bal)||0).toFixed(2); SHOW_MODAL_CLEAN('hostWalletModal'); }
                 if(a==='ban-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(confirm("Ban this Host? They will immediately lose all Host Panel access.")) { if(CF_LIVE) { await updateStaffCF(id, {status: 'banned'}); LOG_ACT('staff','Banned Host', `UID: ${id}`); CLR_CACHE('staff'); TS('Host Banned', 'warning'); await RX_HO_CF(); } else { await update(ref(rd,`staff/${id}`), {status: 'banned'}); LOG_ACT('staff','Banned Host', `UID: ${id}`); CLR_CACHE('staff'); TS('Host Banned', 'warning'); await RX_HO(); } } }
 
                 // v5 CHANGE: manual approve-host-reward / reject-host-reward actions
@@ -6460,18 +6692,49 @@
                     ML['tourneyModal'].show();
                 }
 
-                /* CUTOVER 2026-07-24: deliberately left on Firebase, unlike the rest of the
-                 * Tournaments list -- this modal's kick-player/edit-slot/submit-host-report actions
-                 * have no Cloudflare endpoint at all anywhere in this migration (never built, not
-                 * just unwired). Flipping only the roster LIST to Cloudflare while these writes stay
-                 * on Firebase would silently break: an admin "kicks" a player from a D1-sourced view,
-                 * the write only reaches Firebase, and the kick doesn't stick on next reload -- a
-                 * worse failure than this modal simply not finding a match created after this cutover
-                 * (matches created via createMatchCF get a server-generated id that was never written
-                 * to Firebase at all, so this read will legitimately 404/empty for those -- a real,
-                 * accepted, narrow gap, not a silent bug). */
+                /* CUTOVER 2026-07-24: kick-player/edit-slot/submit-host-report have no Cloudflare
+                 * endpoint anywhere in this migration (never built, not just unwired), so this modal
+                 * stayed on Firebase entirely rather than half-porting it. That's fine for matches
+                 * that still exist in Firebase, but matches created via createMatchCF get a
+                 * server-generated D1 id that was never written to Firebase at all -- this read
+                 * legitimately 404s/empties for those (a real, accepted, narrow gap, not a silent
+                 * bug). The gap became a real problem once CF_LIVE flipped true here: EVERY match in
+                 * the list is now a D1 match, so this modal 404'd on literally every click. Below adds
+                 * a CF_LIVE read-only fallback (GET /matches/:id/players, already public/working) so
+                 * staff can at least SEE the real roster for those matches; kick/edit-slot/host-report
+                 * still need dedicated Worker endpoints before they can work here too. */
                 if(a==='v-tr-p'){
                     E('rpTi').textContent = b.dataset.tn;
+
+                    if (CF_LIVE) {
+                        let players = [];
+                        try { players = (await CF.get(`matches/${id}/players`)).players || []; }
+                        catch (e) { TS('Failed to load participants: ' + e.message, 'error'); }
+                        const h = players.map(p => {
+                            const pName = p.gameName || p.userName || 'Unknown Player';
+                            const pUid = p.gameUid || 'Unknown UID';
+                            const safeName = pName.replace(/'/g, "\\'");
+                            const safeUid = pUid.replace(/'/g, "\\'");
+                            return `<tr>
+                                <td>${FORMAT_USER(p.userId, '')}</td>
+                                <td>
+                                    <div><small class="text-muted">Name:</small> <strong class="text-warning">${pName}</strong> <i class="bi bi-clipboard ms-1 text-primary" style="cursor:pointer;" onclick="window.copyToCb('${safeName}')" title="Copy"></i></div>
+                                    <div><small class="text-muted">UID:</small> <span class="badge bg-dark border border-secondary text-white">${pUid}</span> <i class="bi bi-clipboard ms-1 text-info" style="cursor:pointer;" onclick="window.copyToCb('${safeUid}')" title="Copy"></i></div>
+                                </td>
+                                <td class="text-center font-monospace">${p.slot || 'N/A'}</td>
+                                <td class="text-center font-monospace text-danger">${p.kills || 0}</td>
+                                <td class="text-center font-monospace text-warning">${p.rank ?? '—'}</td>
+                                <td class="text-muted small">Read-only</td>
+                            </tr>`;
+                        }).join('');
+                        E('tbRpL').innerHTML = h || `<tr><td colspan="6" class="text-center text-muted py-4">No Participants Found</td></tr>`;
+                        if (players.length) TS('Slot editing, kicking, and host-report submission aren\'t available yet for matches created on the new backend — this view is read-only.', 'info');
+                        const repBtn = E('btnSubmitHostReport');
+                        if (repBtn) repBtn.style.display = 'none';
+                        SHOW_MODAL_CLEAN('regPModal');
+                        return;
+                    }
+
                     const t = (await get(ref(rd,`tournaments/${id}`))).val();
                     let h = '';
                     if(t && t.registeredPlayers){
@@ -6524,7 +6787,7 @@
                         repBtn.dataset.tid = id;
                     }
 
-                    ML['regPModal'].show();
+                    SHOW_MODAL_CLEAN('regPModal');
                 }
 
                 if(a==='submit-host-report') {
