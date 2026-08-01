@@ -1282,6 +1282,38 @@
             <section id="notifications-section" class="section"><h3 class="fw-bold mb-4"><i class="bi bi-bell-fill text-danger me-2"></i> Push Notifications</h3><div class="row g-4"><div class="col-lg-5"><form class="glass-card border-danger text-white" id="bcastForm"><div class="mb-3"><label class="form-label">Saved Templates</label><div class="d-flex gap-2"><select class="form-select" id="bcTplPick"><option value="">-- Load a saved template --</option></select><button type="button" class="btn btn-outline-secondary" data-action="save-tpl" data-src="bc" title="Save current title + message as a new template"><i class="bi bi-bookmark-plus"></i></button><button type="button" class="btn btn-outline-danger" data-action="del-tpl" data-src="bc" title="Delete selected template"><i class="bi bi-trash"></i></button></div></div><div class="mb-3"><label class="form-label">Notification Title</label><input type="text" class="form-control" id="bcTitle" required></div><div class="mb-3"><label class="form-label">Message Body</label><textarea class="form-control" id="bcMsg" rows="5" required></textarea></div><div class="mb-4"><label class="form-label">Image URL (Optional)</label><input type="url" class="form-control" id="bcImg"></div><button type="submit" class="btn btn-outline-danger w-100 py-3 fw-bold fs-6"><i class="bi bi-send-fill"></i> Send to All Users</button></form></div><div class="col-lg-7"><div class="glass-card p-0 overflow-hidden"><div class="p-4 border-bottom border-secondary bg-dark bg-opacity-25"><h5 class="fw-bold m-0"><i class="bi bi-clock-history me-2"></i> Sent Notifications</h5></div><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Notification Details</th><th>Time Sent</th><th>Action</th></tr></thead><tbody id="tbBcast"></tbody></table></div></div></div></div>
             <hr class="border-secondary my-5">
             <h3 class="fw-bold mb-4"><i class="bi bi-mic-fill text-warning me-2"></i> Host Notifications</h3><div class="row g-4"><div class="col-lg-5"><form class="glass-card border-warning text-white" id="bcastHostForm"><div class="mb-3"><label class="form-label">Notification Title</label><input type="text" class="form-control" id="bcHostTitle" required></div><div class="mb-4"><label class="form-label">Message Body</label><textarea class="form-control" id="bcHostMsg" rows="5" required></textarea></div><button type="submit" class="btn btn-outline-warning w-100 py-3 fw-bold fs-6"><i class="bi bi-send-fill"></i> Send to All Hosts</button></form></div><div class="col-lg-7"><div class="glass-card p-0 overflow-hidden"><div class="p-4 border-bottom border-secondary bg-dark bg-opacity-25"><h5 class="fw-bold m-0"><i class="bi bi-clock-history me-2"></i> Sent Host Notifications</h5></div><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Notification Details</th><th>Time Sent</th><th>Action</th></tr></thead><tbody id="tbBcastHost"></tbody></table></div></div></div></div>
+            <!-- Automated Scheduled Notifications: pick a saved template + a daily IST time, and the
+                 Worker's cron job auto-broadcasts it every day at that time (CF-only, no Firebase
+                 Cloud Function sibling exists for this). Master toggle gates the whole feature; each
+                 row also has its own enabled switch so a schedule can be paused without deleting it. -->
+            <div class="glass-card border-info mt-4" style="border-left: 6px solid var(--info);">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom border-glass">
+                    <h5 class="fw-bold m-0"><i class="bi bi-alarm-fill text-info me-2"></i> Automated Scheduled Notifications</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted small fw-bold text-uppercase">Master Switch</span>
+                        <div class="form-check form-switch m-0"><input class="form-check-input fs-4 m-0" type="checkbox" id="scNtMasterToggle"></div>
+                    </div>
+                </div>
+                <p class="text-muted mb-4">Sends a saved template as a broadcast automatically, every day at the time below (IST). Checked every 5 minutes, so a send lands within a few minutes of the scheduled time.</p>
+                <form id="fmSchedNotif" class="row g-3 align-items-end mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label text-info">Template</label>
+                        <select class="form-select" id="scNtTplPick" required><option value="">-- Load a saved template --</option></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-info">Audience</label>
+                        <select class="form-select" id="scNtAudience"><option value="player">Players</option><option value="host">Hosts</option></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-info">Time (IST, daily)</label>
+                        <input type="time" class="form-control" id="scNtTime" required>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-info w-100 fw-bold"><i class="bi bi-plus-lg"></i> Add</button>
+                    </div>
+                </form>
+                <div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Template</th><th>Audience</th><th>Time (IST)</th><th>Last Sent</th><th>Enabled</th><th>Action</th></tr></thead><tbody id="tbSchedNotif"></tbody></table></div>
+            </div>
         </section>
 
             <section id="tutorials-section" class="section"><div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3"><h3 class="fw-bold m-0"><i class="bi bi-play-circle-fill text-danger me-2"></i> Video Tutorials</h3><button class="btn-premium bg-danger border-0 shadow-lg" data-action="add-tutorial"><i class="bi bi-youtube"></i> Add Video Tutorial</button></div><div class="row g-4" id="tbTutorials"></div></section>
@@ -2157,7 +2189,7 @@
                  * every new ticket -- the exact half-flip risk already avoided for the View Users modal
                  * and Bulk Verify. Revisit once Player app ticket creation is also ported to Cloudflare. */
                 else if(id==='support-chat-section') { E('scEnabledTog').checked = SET.supportChatEnabled !== false; if(CF_LIVE) await RX_SC_CF(); else await RX_SC(); }
-                else if(id==='notifications-section') { if(CF_LIVE) { await RX_NT_CF(); await RX_NT_HOST_CF(); await RENDER_NT_PICKERS_CF(); } else { await RX_NT(); await RX_NT_HOST(); await RENDER_NT_PICKERS(); } }
+                else if(id==='notifications-section') { if(CF_LIVE) { await RX_NT_CF(); await RX_NT_HOST_CF(); await RENDER_NT_PICKERS_CF(); await RX_SCHED_NOTIF_CF(); } else { await RX_NT(); await RX_NT_HOST(); await RENDER_NT_PICKERS(); } }
             });
         };
 
@@ -5979,7 +6011,7 @@
             const opts = Object.entries(TPL_CACHE)
                 .sort(([, a], [, b]) => (a.name || a.title || '').localeCompare(b.name || b.title || ''))
                 .map(([id, t]) => `<option value="${id}">${t.name || t.title || '(untitled)'}</option>`).join('');
-            ['bcTplPick', 'psTplPick'].forEach(selId => {
+            ['bcTplPick', 'psTplPick', 'scNtTplPick'].forEach(selId => {
                 const el = E(selId); if (!el.options) return;
                 const cur = el.value;
                 el.innerHTML = `<option value="">-- Load a saved template --</option>${opts}`;
@@ -5998,7 +6030,7 @@
             const opts = Object.entries(TPL_CACHE)
                 .sort(([, a], [, b]) => (a.name || a.title || '').localeCompare(b.name || b.title || ''))
                 .map(([id, t]) => `<option value="${id}">${t.name || t.title || '(untitled)'}</option>`).join('');
-            ['bcTplPick', 'psTplPick'].forEach(selId => {
+            ['bcTplPick', 'psTplPick', 'scNtTplPick'].forEach(selId => {
                 const el = E(selId); if (!el.options) return;
                 const cur = el.value;
                 el.innerHTML = `<option value="">-- Load a saved template --</option>${opts}`;
@@ -6007,6 +6039,61 @@
         };
         if (E('bcTplPick').addEventListener) E('bcTplPick').addEventListener('change', e => { const t = TPL_CACHE[e.target.value]; if (t) { E('bcTitle').value = t.title || ''; E('bcMsg').value = t.message || ''; } });
         if (E('psTplPick').addEventListener) E('psTplPick').addEventListener('change', e => { const t = TPL_CACHE[e.target.value]; if (t) { E('psH').value = t.title || ''; E('psM').value = t.message || ''; } });
+
+        /* Automated Scheduled Notifications -- CF-only, no Firebase Cloud Function sibling (the
+         * cron job that actually sends these only exists on the Worker). Master toggle lives in
+         * the generic settings table (scheduledNotificationsEnabled); per-row enabled lives on
+         * each scheduled_notifications record itself. Template names are resolved from TPL_CACHE
+         * (already populated by RENDER_NT_PICKERS_CF, called just before this in R_L), not
+         * denormalized onto the schedule row -- same precedent as the Host Reward Log resolving
+         * hostId/tournamentId against its own already-cached lists. */
+        const RX_SCHED_NOTIF_CF = async () => {
+            if (!E('scNtMasterToggle')) return;
+            try {
+                const s = await CF.get('settings');
+                E('scNtMasterToggle').checked = s.scheduledNotificationsEnabled === true;
+            } catch (e) {}
+            try {
+                const data = await CF.get('scheduled-notifications');
+                const rows = data.schedules || [];
+                let h = '';
+                rows.forEach(r => {
+                    const tpl = TPL_CACHE[r.templateId];
+                    const tplName = tpl ? ESC(tpl.name || tpl.title || '(untitled)') : '<span class="text-danger">(template deleted)</span>';
+                    h += `<tr>
+                        <td>${tplName}</td>
+                        <td><span class="badge bg-dark border border-secondary text-white">${r.audience === 'host' ? 'Hosts' : 'Players'}</span></td>
+                        <td class="font-monospace">${ESC(r.timeOfDay)}</td>
+                        <td><small class="text-muted font-monospace">${r.lastSentDate ? ESC(r.lastSentDate) : 'Never'}</small></td>
+                        <td><div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" data-action="toggle-sched-notif" data-id="${r.id}" ${r.enabled ? 'checked' : ''}></div></td>
+                        <td><button class="btn btn-sm btn-outline-danger py-1" data-action="del-sched-notif" data-id="${r.id}"><i class="bi bi-trash"></i></button></td>
+                    </tr>`;
+                });
+                E('tbSchedNotif').innerHTML = h || `<tr><td colspan="6" class="text-center text-muted py-4">No scheduled notifications yet.</td></tr>`;
+            } catch (e) {
+                E('tbSchedNotif').innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading schedules</td></tr>`;
+            }
+        };
+
+        if (E('scNtMasterToggle')) E('scNtMasterToggle').onchange = e => { const checked = e.target.checked; A_EX(async () => {
+            if (!CHK_P('notif_mgt')) { e.target.checked = !checked; return TS('Unauthorized', 'error'); }
+            await saveSettingsCF({ scheduledNotificationsEnabled: checked });
+            LOG_ACT('staff', 'Toggled Scheduled Notifications', checked ? 'ON' : 'OFF');
+            TS(`Scheduled Notifications ${checked ? 'enabled' : 'disabled'}`);
+        }); };
+
+        if (E('fmSchedNotif')) E('fmSchedNotif').onsubmit = e => { e.preventDefault(); A_EX(async () => {
+            if (!CHK_P('notif_mgt')) return TS('Unauthorized', 'error');
+            const templateId = E('scNtTplPick').value;
+            if (!templateId) return TS('Select a template first', 'error');
+            const timeOfDay = E('scNtTime').value;
+            if (!timeOfDay) return TS('Pick a time', 'error');
+            await CF.post('scheduled-notifications', { templateId, audience: E('scNtAudience').value, timeOfDay });
+            LOG_ACT('staff', 'Added Scheduled Notification', `${templateId} @ ${timeOfDay}`);
+            TS('Schedule Added');
+            E('fmSchedNotif').reset();
+            await RX_SCHED_NOTIF_CF();
+        }, e.submitter || e.target.querySelector('button[type="submit"]')); };
 
         const RX_ST = async () => {
             if(!PAGE_CACHE['staff']) E('tbStaff').innerHTML=PHO(6);
@@ -6621,6 +6708,8 @@
                  * no persistent cache object, matching their _CF loaders' own local-var shape). */
                 if(a==='e-an'){ if(!CHK_P('promo_mgt')) return TS('Unauthorized','error'); E('fmAnnouncement').reset(); try { const an = CF_LIVE ? (await CF.get('announcements')).announcements.find(x=>x.id===id) : (await get(ref(rd,`announcements/${id}`))).val(); if(!an) throw new Error('not found'); E('anId').value = id; E('anText').value = an.text; E('anStatus').value = an.status || 'active'; if([10, 15, 25].includes(Number(an.speed))) { E('anSpeed').value = an.speed; E('anCustomSpeedDiv').style.display = 'none'; } else { E('anSpeed').value = 'custom'; E('anCustomSpeed').value = an.speed || 15; E('anCustomSpeedDiv').style.display = 'block'; } ML['announcementModal'].show(); } catch(err) { TS('Error fetching data', 'error'); } }
                 if(a==='tg-an'){ if(!CHK_P('promo_mgt')) { b.checked = !b.checked; return TS('Unauthorized','error'); } const newStatus = b.checked ? 'active' : 'inactive'; if(CF_LIVE) { await setAnnouncementStatusCF(id, newStatus); TS(`Announcement is now ${newStatus}`); } else { await update(ref(rd, `announcements/${id}`), { status: newStatus, updatedAt: Date.now() }); TS(`Announcement is now ${newStatus}`); } }
+                if(a==='toggle-sched-notif'){ if(!CHK_P('notif_mgt')) { b.checked = !b.checked; return TS('Unauthorized','error'); } await CF.put(`scheduled-notifications/${id}`, { enabled: b.checked }); LOG_ACT('staff', 'Toggled Scheduled Notification', id); TS(`Schedule ${b.checked ? 'Enabled' : 'Disabled'}`); }
+                if(a==='del-sched-notif'){ if(!CHK_P('notif_mgt')) return TS('Unauthorized','error'); if(confirm('Delete this scheduled notification?')) { await CF.del(`scheduled-notifications/${id}`); LOG_ACT('staff', 'Deleted Scheduled Notification', id); TS('Schedule Deleted'); await RX_SCHED_NOTIF_CF(); } }
                 if(a==='e-ga'){ if(!CHK_P('game_mgt') && !CHK_P('match_edit')) return TS('Unauthorized','error'); E('fmGame').reset(); const g=CF_LIVE ? (GC[id] || (await CF.get('games')).games.find(x=>x.id===id)) : (await get(ref(rd,`games/${id}`))).val(); if(!g) return TS('Game not found','error'); E('gaId').value=id; E('gaN').value=g.name; E('gaU').value=g.imageUrl||''; E('gaStatus').value=g.status||'active'; ML['gameModal'].show(); }
                 if(a==='e-md'){ if(!CHK_P('mode_mgt')) return TS('Unauthorized','error'); E('fmMode').reset(); const m=CF_LIVE ? (MC[id] || (await CF.get('modes')).modes.find(x=>x.id===id)) : (await get(ref(rd,`modes/${id}`))).val(); if(!m) return TS('Mode not found','error'); E('mdId').value=id; if(!Object.keys(GC).length) { if(CF_LIVE) await RX_GA_CF().catch(()=>{}); else await RX_GA().catch(()=>{}); } E('mdGameId').innerHTML = '<option value="">Select Game</option>' + Object.entries(GC).map(([gid,g])=>`<option value="${gid}" ${gid===m.gameId?'selected':''}>${g.name}</option>`).join(''); E('mdName').value=m.name; E('mdThumbU').value=m.thumbnailUrl||''; E('mdRules').value=m.rules||''; E('mdStatus').value=m.status||'active'; ML['modeModal'].show(); }
                 if(a==='e-pr'){ if(!CHK_P('promo_mgt')) return TS('Unauthorized','error'); E('fmPromo').reset(); const p=CF_LIVE ? (await CF.get('promotions')).promotions.find(x=>x.id===id) : (await get(ref(rd,`promotions/${id}`))).val(); if(!p) return TS('Promotion not found','error'); E('prId').value=id; E('prTitle').value=p.title||''; E('prDesc').value=p.description||''; E('prTime').value=p.sliderTime||5; E('prU').value=p.imageUrl; E('prT').value=p.link||''; E('prS').checked=p.active!==false; ML['promoModal'].show(); }
