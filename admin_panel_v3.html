@@ -1912,6 +1912,18 @@
             return `<strong class="text-white text-truncate d-inline-block mb-1" style="max-width:180px;">Name : ${name}</strong>${vipTag}${phoneLine}<br><small class="text-muted font-monospace text-truncate d-inline-block mb-1" style="max-width:180px;">Email : ${email}</small><br><small class="text-info font-monospace text-truncate d-inline-block" style="max-width:180px;">UID : ${ESC(uid)}</small>`;
         };
 
+        /* CUTOVER 2026-08-02: FORMAT_USER only ever reads UC[uid], and UC is now populated
+         * lazily (Dashboard no longer downloads the full users table for bandwidth reasons) --
+         * so tabs like Deposits/Withdrawals/Analytics that never visited Users/Leaderboard first
+         * showed "Unknown" for everyone. The Worker's list endpoints for those tabs now join
+         * displayName/email/phone onto each row directly; this merges that row-supplied data into
+         * UC right before FORMAT_USER reads it, so the existing helper needs no other changes. */
+        const WARM_UC = (uid, row) => {
+            if (!uid || !row) return;
+            const existing = UC[uid] || {};
+            UC[uid] = { ...existing, displayName: row.displayName || existing.displayName, email: row.email || existing.email, phone: row.phone || existing.phone };
+        };
+
         // 🚀 Non-Blocking Async Executor
         const A_EX = async (fn, b = null) => {
             if(LK) return; LK = true;
@@ -2552,29 +2564,26 @@
         };
 
         /* CF sibling (Wave 4) -- GET /admin/analytics ("analytics" permission), feeding the same
-         * bzSpenders/bzActive/bzDormant widgets RX_UA renders. Real IDs/markup confirmed by reading
-         * RX_UA itself (not guessed) -- the original's own comment above RX_UA notes Dormant Users
-         * reads the in-memory `UC` cache directly rather than the daily analyticsSnapshot, since it
-         * needs to stay consistent with R_US's own "active" definition; the Worker's `inactiveUsers`
-         * is a legitimate substitute here (computed server-side, same 15-day recency rule, and UC
-         * is already populated by RX_DS_CF/RX_DS before this tab is reachable), so it's used directly
-         * rather than re-deriving the same list from UC a second way. FORMAT_USER needs a real `u`
-         * object (u.email) to render a name/avatar -- since this tab doesn't refetch the full user
-         * list, only a truncated uid fallback is available unless UC already has that uid cached
-         * from a prior Dashboard/Users-tab visit. */
+         * bzSpenders/bzActive/bzDormant widgets RX_UA renders.
+         * CUTOVER 2026-08-02 FIX: the comment this replaced claimed UC was "already populated by
+         * RX_DS_CF/RX_DS before this tab is reachable" -- that stopped being true once Dashboard's
+         * bandwidth-reduction pass removed its full users-table download (RX_DS_CF only fetches
+         * aggregate stats now), so every name here silently fell back to a raw truncated uid. The
+         * Worker's topSpenders/mostActive/inactiveUsers now each join displayName/email onto their
+         * rows directly; WARM_UC merges that into UC right before nameOf/FORMAT_USER reads it. */
         const RX_UA_CF = async () => {
             const data = await CF.get('admin/analytics');
-            const nameOf = (uid) => UC[uid] ? FORMAT_USER(uid, UC[uid].email) : (uid ? uid.slice(0,8) : 'User');
+            const nameOf = (uid, row) => { WARM_UC(uid, row); return UC[uid] ? FORMAT_USER(uid, UC[uid].email) : (uid ? uid.slice(0,8) : 'User'); };
 
-            const sh = (data.topSpenders||[]).map(x=>`<tr><td>${nameOf(x.userId)}</td><td class="text-end text-success fw-bold font-monospace fs-5">${FMT_C(P2R(x.amount))}</td></tr>`).join('');
+            const sh = (data.topSpenders||[]).map(x=>`<tr><td>${nameOf(x.userId, x)}</td><td class="text-end text-success fw-bold font-monospace fs-5">${FMT_C(P2R(x.amount))}</td></tr>`).join('');
             if (E('bzSpenders')) E('bzSpenders').innerHTML = `<table class="table table-glass mb-0"><tbody>${sh||'<tr><td class="text-center text-muted">No Data Found</td></tr>'}</tbody></table>`;
 
-            const ah = (data.mostActive||[]).map(x=>`<tr><td>${nameOf(x.userId)}</td><td class="text-end text-info fw-bold font-monospace fs-5">${x.matches} Matches</td></tr>`).join('');
+            const ah = (data.mostActive||[]).map(x=>`<tr><td>${nameOf(x.userId, x)}</td><td class="text-end text-info fw-bold font-monospace fs-5">${x.matches} Matches</td></tr>`).join('');
             if (E('bzActive')) E('bzActive').innerHTML = `<table class="table table-glass mb-0"><tbody>${ah||'<tr><td class="text-center text-muted">No Data Found</td></tr>'}</tbody></table>`;
 
             if (E('bzAnalyticsUpdated')) E('bzAnalyticsUpdated').textContent = '';
 
-            const dh = (data.inactiveUsers||[]).map(x=>`<tr><td>${nameOf(x.id)}</td><td class="text-end text-danger"><small>${DT(x.lastActivityAt)}</small></td></tr>`).join('');
+            const dh = (data.inactiveUsers||[]).map(x=>`<tr><td>${nameOf(x.id, x)}</td><td class="text-end text-danger"><small>${DT(x.lastActivityAt)}</small></td></tr>`).join('');
             if (E('bzDormant')) E('bzDormant').innerHTML = `<table class="table table-glass mb-0"><tbody>${dh||'<tr><td class="text-center text-muted">Everyone is Active!</td></tr>'}</tbody></table>`;
         };
 
@@ -5896,12 +5905,16 @@
                     E('wdTh').innerHTML=tH[s]; if (!loadMore) E('tbWd').innerHTML=PHO(colspan);
                     const data = await CF.get(`withdrawals?status=${cfStatus}&limit=${WD_LIMIT}`); let h='';
                     (data.withdrawals || []).slice().sort((x,y)=>(Number(y.createdAt)||0)-(Number(x.createdAt)||0)).forEach(w=>{
+                        WARM_UC(w.userId, w);
                         h+=`<tr><td><small class="font-monospace">${DT(w.createdAt||w.processedAt)}</small></td>
                         <td>${FORMAT_USER(w.userId)}</td>
                         <td class="text-danger fw-bold font-monospace fs-5">${FMT_C(P2R(w.amount))}</td>`;
-                        const details = w.upi||'--';
-                        if(s==='pending') h+=`<td><small class="text-warning fw-bold bg-dark px-2 p-1 rounded font-monospace border border-secondary d-inline-block" style="white-space:nowrap;" title="${details}">${details}</small></td><td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-success fw-bold py-1" data-action="ap-w-cf" data-id="${w.id}"><i class="bi bi-check-lg"></i> Approve</button><button class="btn btn-sm btn-outline-danger fw-bold py-1" data-action="rj-w-cf" data-id="${w.id}"><i class="bi bi-x-lg"></i> Reject</button></div></td>`;
-                        else if(s==='completed') h+=`<td><small class="text-muted fw-bold font-monospace d-inline-block" style="white-space:nowrap;" title="${details}">${details}</small></td><td><small class="text-success text-truncate d-inline-block" style="max-width:120px;">${w.adminNote||'--'}</small></td>`;
+                        // Account holder name lets staff eyeball it against the UPI id before paying out --
+                        // older app builds predating this field leave it null, so fall back to a clear flag
+                        // rather than silently showing nothing.
+                        const details = `${w.upi||'--'}<br><span class="${w.accountHolderName ? 'text-info' : 'text-danger'}">${w.accountHolderName ? ESC(w.accountHolderName) : 'Not provided'}</span>`;
+                        if(s==='pending') h+=`<td><small class="text-warning fw-bold bg-dark px-2 p-1 rounded font-monospace border border-secondary d-inline-block" style="white-space:nowrap;">${details}</small></td><td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-success fw-bold py-1" data-action="ap-w-cf" data-id="${w.id}"><i class="bi bi-check-lg"></i> Approve</button><button class="btn btn-sm btn-outline-danger fw-bold py-1" data-action="rj-w-cf" data-id="${w.id}"><i class="bi bi-x-lg"></i> Reject</button></div></td>`;
+                        else if(s==='completed') h+=`<td><small class="text-muted fw-bold font-monospace d-inline-block" style="white-space:nowrap;">${details}</small></td><td><small class="text-success text-truncate d-inline-block" style="max-width:120px;">${w.adminNote||'--'}</small></td>`;
                         else h+=`<td><small class="text-danger text-truncate d-inline-block" style="max-width:150px;">${w.rejectReason||'--'}</small></td>`;
                         h+='</tr>';
                     });
@@ -5914,6 +5927,7 @@
                     E('wdTh').innerHTML=tH[s]; if (!loadMore) E('tbWd').innerHTML=PHO(colspan);
                     const data = await CF.get(`withdrawals?status=${cfStatus}&method=redeem&limit=${WD_LIMIT}`); let h='';
                     (data.withdrawals || []).slice().sort((x,y)=>(Number(y.createdAt)||0)-(Number(x.createdAt)||0)).forEach(w=>{
+                        WARM_UC(w.userId, w);
                         const em = (UC[w.userId] && UC[w.userId].email) || w.userId; const amtR = P2R(w.amount);
                         h+=`<tr><td><small class="font-monospace">${DT(w.createdAt||w.processedAt)}</small></td>
                         <td>${FORMAT_USER(w.userId)}</td>
@@ -6222,6 +6236,7 @@
             try {
                 const data = await CF.get(`deposits?status=${cfStatus}&limit=${DP_LIMIT}`); let h='';
                 (data.deposits || []).slice().sort((x,y)=>(Number(y.createdAt)||0)-(Number(x.createdAt)||0)).forEach(d=>{
+                    WARM_UC(d.userId, d);
                     const isImg = d.utr && (d.utr.includes('http') || d.utr.includes('imgbb'));
                     const utrDisplay = isImg ? `<a href="${d.utr}" target="_blank" class="text-info text-decoration-underline"><i class="bi bi-image"></i> View Receipt</a>` : `<small class="text-warning fw-bold font-monospace bg-dark px-1 rounded border border-secondary text-truncate d-inline-block" style="max-width:120px;">${d.utr||'-'}</small>`;
                     h+=`<tr><td><small class="font-monospace">${DT(d.createdAt)}</small></td>
