@@ -6325,6 +6325,10 @@
             try {
                 const data = await CF.get(`referrals?status=${s}`); let h='';
                 (data.referrals||[]).forEach(r=>{
+                    // GET /referrals already joins the referrer's identity server-side (referrerName/
+                    // referrerEmail/referrerPhone) -- same WARM_UC pattern as deposits/withdrawals/
+                    // analytics so FORMAT_USER doesn't fall back to "Unknown" via an unwarmed UC.
+                    WARM_UC(r.referrerId, { displayName: r.referrerName, email: r.referrerEmail, phone: r.referrerPhone });
                     const child = r.referredName || (r.referredEmail ? r.referredEmail.split('@')[0] : '') || r.referredPhone || '-';
                     h+=`<tr><td><small class="font-monospace">${DT(s==='pending'?r.createdAt:r.creditedAt)}</small></td>
                     <td>${FORMAT_USER(r.referrerId, r.referrerEmail)}</td>
@@ -6340,7 +6344,10 @@
                 const [pend, comp] = await Promise.all([CF.get('referrals?status=pending'), CF.get('referrals?status=completed')]);
                 const pendingList = pend.referrals || [], completedList = comp.referrals || [];
                 let totE = 0, refsMap = {};
-                completedList.forEach(r=>{ const am = P2R(r.creditedAmount||0); totE += am; refsMap[r.referrerId] = (refsMap[r.referrerId]||0) + am; });
+                completedList.forEach(r=>{
+                    WARM_UC(r.referrerId, { displayName: r.referrerName, email: r.referrerEmail, phone: r.referrerPhone });
+                    const am = P2R(r.creditedAmount||0); totE += am; refsMap[r.referrerId] = (refsMap[r.referrerId]||0) + am;
+                });
                 E('refAnaTotal').textContent = pendingList.length + completedList.length; E('refAnaEarn').innerHTML = FMT_C(totE);
                 let topU = '--', maxE = -1; Object.entries(refsMap).forEach(([u, am])=>{ if(am > maxE){ maxE = am; topU = UC[u]?.displayName || UC[u]?.email?.split('@')[0] || u; }});
                 E('refAnaTop').textContent = topU;
