@@ -2891,7 +2891,10 @@
             try {
                 const data = await CF.get('redeem-codes'); let h='';
                 (data.codes || []).slice().sort((x,y) => (Number(y.createdAt)||0) - (Number(x.createdAt)||0)).forEach(r => {
-                    h+=`<tr><td class="fw-bold font-monospace text-warning text-truncate" style="max-width:150px;">${r.code||'-'}</td><td class="text-success fw-bold fs-6">${FMT_C(P2R(r.amount))}</td><td><span class="badge-premium badge-${r.status==='active'?'success':'danger'}">${(r.status||'N/A').toUpperCase()}</span></td><td><small>${DT(r.createdAt)}</small></td><td><div class="small">${r.usedBy ? FORMAT_USER(r.usedBy) : '--'}</div></td><td><button class="btn btn-sm btn-outline-danger" data-action="d-rc" data-id="${r.code}"><i class="bi bi-trash"></i></button></td></tr>`;
+                    // GET /redeem-codes already joins the used-by account's name/email -- same
+                    // WARM_UC pattern as deposits/withdrawals/referrals/participants.
+                    if (r.usedBy) WARM_UC(r.usedBy, { displayName: r.usedByName, email: r.usedByEmail });
+                    h+=`<tr><td class="fw-bold font-monospace text-warning text-truncate" style="max-width:150px;">${r.code||'-'}</td><td class="text-success fw-bold fs-6">${FMT_C(P2R(r.amount))}</td><td><span class="badge-premium badge-${r.status==='active'?'success':'danger'}">${(r.status||'N/A').toUpperCase()}</span></td><td><small>${DT(r.createdAt)}</small></td><td><div class="small">${r.usedBy ? FORMAT_USER(r.usedBy, r.usedByEmail || '') : '--'}</div></td><td><button class="btn btn-sm btn-outline-danger" data-action="d-rc" data-id="${r.code}"><i class="bi bi-trash"></i></button></td></tr>`;
                 });
                 E('tbRedeem').innerHTML = h || `<tr><td colspan="6" class="text-center text-muted py-4">No Redeem Codes Active</td></tr>`;
             } catch(e) { E('tbRedeem').innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading codes</td></tr>`; }
