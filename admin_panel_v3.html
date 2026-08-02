@@ -7509,12 +7509,18 @@
                         try { players = (await CF.get(`matches/${id}/players`)).players || []; }
                         catch (e) { TS('Failed to load participants: ' + e.message, 'error'); }
                         const h = players.map(p => {
+                            // GET /matches/:id/players already joins the account's own display
+                            // name/email (userName/userEmail) -- same WARM_UC pattern as deposits/
+                            // withdrawals/referrals so FORMAT_USER doesn't fall back to "Unknown"
+                            // via an unwarmed UC. Not to be confused with p.gameName/p.gameUid
+                            // below (the in-game identity for THIS match, always shown correctly).
+                            WARM_UC(p.userId, { displayName: p.userName, email: p.userEmail });
                             const pName = p.gameName || p.userName || 'Unknown Player';
                             const pUid = p.gameUid || 'Unknown UID';
                             const safeName = pName.replace(/'/g, "\\'");
                             const safeUid = pUid.replace(/'/g, "\\'");
                             return `<tr>
-                                <td>${FORMAT_USER(p.userId, '')}</td>
+                                <td>${FORMAT_USER(p.userId, p.userEmail || '')}</td>
                                 <td>
                                     <div><small class="text-muted">Name:</small> <strong class="text-warning">${pName}</strong> <i class="bi bi-clipboard ms-1 text-primary" style="cursor:pointer;" onclick="window.copyToCb('${safeName}')" title="Copy"></i></div>
                                     <div><small class="text-muted">UID:</small> <span class="badge bg-dark border border-secondary text-white">${pUid}</span> <i class="bi bi-clipboard ms-1 text-info" style="cursor:pointer;" onclick="window.copyToCb('${safeUid}')" title="Copy"></i></div>
