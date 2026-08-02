@@ -240,7 +240,6 @@
                 <li><a class="nav-link" data-section="users-section"><i class="bi bi-people-fill"></i> Users</a></li>
                 <li><a class="nav-link" data-section="tutorials-section"><i class="bi bi-play-circle-fill"></i> Tutorials</a></li>
                 <li><a class="nav-link" data-section="notifications-section"><i class="bi bi-bell-fill"></i> Notifications</a></li>
-                <li><a class="nav-link" data-section="support-chat-section"><i class="bi bi-chat-dots-fill"></i> Support Chat <span class="badge badge-danger ms-auto px-2" id="badgeSc" style="display:none; background:var(--danger); border-radius:8px;">0</span></a></li>
 
                 <div class="nav-label">Settings & Staff</div>
                 <li><a class="nav-link" data-section="language-section"><i class="bi bi-translate"></i> Languages</a></li>
@@ -260,6 +259,16 @@
             <div class="d-flex align-items-center gap-3">
                 <button class="mobile-toggle d-lg-none" id="openSidebarBtn" style="display: none;"><i class="bi bi-list"></i></button>
                 <h5 class="fw-bold m-0 d-none d-sm-block text-truncate" id="activePageTitle" style="max-width: 250px;">Dashboard</h5>
+            </div>
+            <!-- Universal search (p6 spec): server-side, indexed exact-match-first lookup across
+                 users/matches/transactions/deposits/withdrawals/host-withdrawals, so staff never have
+                 to open the Users/Matches tab and download everything just to find one record. -->
+            <div class="position-relative flex-grow-1 mx-2" style="max-width: 420px;">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark border-secondary text-muted"><i class="bi bi-search"></i></span>
+                    <input type="search" class="form-control form-control-sm" id="globalSearchInput" placeholder="Search user, match, phone, txn/withdrawal ID..." autocomplete="off">
+                </div>
+                <div id="globalSearchResults" class="glass-card p-2" style="display:none; position:absolute; top:110%; left:0; right:0; z-index:1055; max-height:70vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.4);"></div>
             </div>
             <div class="d-flex align-items-center gap-3">
                 <div class="d-none d-md-flex align-items-center gap-2 px-3 py-1 rounded-pill" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass);">
@@ -925,6 +934,7 @@
                          </table>
                      </div>
                  </div>
+                 <div class="text-center my-3" id="matchesLoadMoreWrap" style="display:none;"><button class="btn btn-outline-info fw-bold" id="matchesLoadMoreBtn"><i class="bi bi-arrow-down-circle"></i> Load More Matches</button></div>
             </section>
 
             <section id="tournament-management-section" class="section">
@@ -935,7 +945,36 @@
                      "everything still awaiting verification" without scrolling a long list. -->
                 <div class="glass-card p-3 mb-3">
                     <div class="row g-2 align-items-center">
-                        <div class="col-6 col-md-3">
+                        <div class="col-12 col-md-3">
+                            <!-- MOVED here 2026-08-02 (was a separate box down near the match select) so
+                                 it sits alongside the other filters instead of being a disconnected
+                                 second search tool. An exact server lookup (see RX_TM_CF), not a filter
+                                 over the fetched snapshot -- it works with or without a leading "#", and
+                                 can reach matches outside the Time Window below, unlike every other
+                                 filter on this card. Matching this narrows "Matches Matching Filter"
+                                 below to just that one match -- click it to open it, same as any other
+                                 card in the list. -->
+                            <label class="form-label">Search Match by ID</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-dark border-danger text-white" id="tmMatchSearchInput" placeholder="Match ID, e.g. 1065 (# optional)">
+                                <button class="btn btn-danger fw-bold" id="btnSearchMatchById" type="button"><i class="bi bi-search"></i></button>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <!-- BANDWIDTH FIX 2026-08-02: bounds what actually gets fetched from the
+                                 server (see RX_TM_CF) -- a match's result only ever needs entering
+                                 within a couple days of it starting, so there's no real reason this
+                                 screen's candidate pool should include matches from months ago.
+                                 Older matches are still reachable via Search Match by #ID (an
+                                 unbounded, indexed server lookup, not affected by this window). -->
+                            <label class="form-label">Time Window</label>
+                            <select class="form-select" id="tmResultWindowFilter">
+                                <option value="2">Last 2 Days</option>
+                                <option value="5">Last 5 Days</option>
+                                <option value="7">Last 7 Days</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
                             <label class="form-label">Result Status</label>
                             <select class="form-select" id="tmResultStatusFilter">
                                 <option value="">All (Awaiting + Completed)</option>
@@ -944,7 +983,7 @@
                                 <option value="completed">Completed</option>
                             </select>
                         </div>
-                        <div class="col-6 col-md-3">
+                        <div class="col-6 col-md-2">
                             <label class="form-label">Quick Filter</label>
                             <select class="form-select" id="tmResultQuickFilter">
                                 <option value="">No Quick Filter</option>
@@ -981,11 +1020,7 @@
                 <div class="glass-card">
                     <div class="row mb-4">
                         <div class="col-md-4 col-lg-4">
-                            <label class="form-label">Search Match by #ID or Select below</label>
-                            <div class="input-group mb-2">
-                                <input type="text" class="form-control bg-dark border-danger text-white" id="tmMatchSearchInput" placeholder="Enter Match #ID (e.g., #000001)...">
-                                <button class="btn btn-danger fw-bold" id="btnSearchMatchById" type="button"><i class="bi bi-search"></i></button>
-                            </div>
+                            <label class="form-label">Or Select a Match Directly</label>
                             <select class="form-select fw-bold border-danger" id="computationTargetSelect"></select>
                         </div>
                         <div class="col-md-5 col-lg-4" id="tmSearchSortBox" style="display:none;">
@@ -1125,6 +1160,39 @@
                     </div>
                 </div>
                 <p class="text-muted mb-4">Runs automatically every day at 12:05 AM IST once switched on. Sunday always uses the Sunday timetable below; every other day uses the Weekday one.</p>
+
+                <!-- Partial time-range generation: generate today's schedule in batches instead of
+                     all at once, e.g. 10 AM-1 PM now, 1 PM-4 PM later. Server-side validated against
+                     the configured schedule's own bounds, and safe against duplicate/overlapping
+                     ranges (see POST /scheduler/generate-range). -->
+                <div class="glass-card mb-3" id="msRangeCard">
+                    <h6 class="fw-bold mb-1"><i class="bi bi-clock-history text-info me-2"></i> Generate a Time Range</h6>
+                    <!-- Generation always targets TODAY's actual schedule (same as "Generate Today's
+                         Matches Now" above, and the automatic cron) -- NOT whichever tab is open below.
+                         Made explicit here since it's easy to be looking at the wrong tab, especially
+                         right around midnight IST when "today" just changed. -->
+                    <div class="small mb-3" id="msTodayScheduleNote"></div>
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small text-muted mb-1">Overall Schedule</label>
+                            <div class="form-control form-control-sm bg-dark text-info fw-bold" id="msOverallRangeTxt">--</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small text-muted mb-1">Generate From</label>
+                            <input type="time" class="form-control form-control-sm" id="msRangeFrom">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small text-muted mb-1">Generate Until</label>
+                            <input type="time" class="form-control form-control-sm" id="msRangeUntil">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <button class="btn btn-premium w-100" id="msGenerateRangeBtn"><i class="bi bi-play-fill"></i> Generate Matches</button>
+                        </div>
+                    </div>
+                    <label class="form-label small text-muted mb-1">Coverage (today)</label>
+                    <div id="msCoverageBar" style="height:22px; border-radius:6px; overflow:hidden; background:rgba(255,255,255,0.06); position:relative; display:flex;"></div>
+                    <div class="mt-1 small text-muted" id="msCoverageLegend"></div>
+                </div>
 
                 <ul class="nav nav-pills gap-2 mb-3">
                     <li class="nav-item"><button type="button" class="nav-link active fw-bold px-4 py-2" data-ms-tab="weekday" id="msWeekdayTabBtn">Weekday (Mon–Sat)</button></li>
@@ -1273,6 +1341,7 @@
                     <div class="mt-2" id="userFilterCount"></div>
                 </div>
                 <div class="glass-card p-0 overflow-hidden"><div class="table-responsive"><table class="table table-glass mb-0" id="usDB"><thead><tr><th>User Details</th><th>Game ID</th><th>Referral Code</th><th>Wallet Balance</th><th>Status</th><th>Action</th></tr></thead><tbody id="tbUsers"></tbody></table></div></div>
+                <div class="text-center my-3" id="usersLoadMoreWrap" style="display:none;"><button class="btn btn-outline-info fw-bold" id="usersLoadMoreBtn"><i class="bi bi-arrow-down-circle"></i> Load More Users</button></div>
             </section>
 
             <section id="user-analytics-section" class="section"><h3 class="fw-bold mb-4"><i class="bi bi-pie-chart-fill text-primary me-2"></i> User Analytics</h3><div class="row g-4"><div class="col-lg-4"><div class="glass-card h-100 p-0"><div class="p-3 border-bottom border-secondary"><h6 class="m-0 fw-bold" style="color:var(--success);"><i class="bi bi-cash-coin me-2"></i> Top Spenders (Deposits)</h6></div><div class="table-responsive" id="bzSpenders"></div></div></div><div class="col-lg-4"><div class="glass-card h-100 p-0"><div class="p-3 border-bottom border-secondary"><h6 class="m-0 fw-bold" style="color:var(--info);"><i class="bi bi-joystick me-2"></i> Most Active Players</h6></div><div class="table-responsive" id="bzActive"></div></div></div><div class="col-lg-4"><div class="glass-card h-100 p-0"><div class="p-3 border-bottom border-secondary"><h6 class="m-0 fw-bold" style="color:var(--danger);"><i class="bi bi-heartbreak me-2"></i> Inactive Users (>15 Days)</h6></div><div class="table-responsive" id="bzDormant"></div></div></div></div></section>
@@ -1323,31 +1392,6 @@
             <section id="support-manager-section" class="section"><h3 class="fw-bold mb-4 text-success"><i class="bi bi-headset me-2"></i> Customer Support Options</h3><form id="commRouteForm"><div class="glass-card border-success"><div class="row g-4"><div class="col-md-6"><div class="d-flex justify-content-between mb-2 p-2 rounded" style="background:rgba(0,0,0,0.15); border:1px solid var(--border-glass);"><label class="form-label m-0 text-success fw-bold"><i class="bi bi-whatsapp fs-6"></i> WhatsApp Link</label><div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="cmWaTog"></div></div><input type="url" class="form-control" id="cmWa" placeholder="https://wa.me/91xxxxxxxxxx"></div><div class="col-md-6"><div class="d-flex justify-content-between mb-2 p-2 rounded" style="background:rgba(0,0,0,0.15); border:1px solid var(--border-glass);"><label class="form-label m-0 text-info fw-bold"><i class="bi bi-telegram fs-6"></i> Telegram Link</label><div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="cmTgTog"></div></div><input type="url" class="form-control" id="cmTg" placeholder="https://t.me/yourusername"></div></div><div class="row g-4 mt-1"><div class="col-12"><div class="d-flex justify-content-between mb-2 p-2 rounded" style="background:rgba(0,0,0,0.15); border:1px solid var(--border-glass);"><label class="form-label m-0 fw-bold" style="color:#25d3c4;"><i class="bi bi-chat-dots-fill fs-6"></i> Tawk.to Live Chat</label><div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="tkTog"></div></div><input type="url" class="form-control" id="tkUrl" placeholder="https://tawk.to/chat/xxxxx/yyyyy"></div></div></div><button type="submit" class="btn-outline-success px-5 py-3 fw-bold fs-5 shadow-lg"><i class="bi bi-save2"></i> Save Support Links</button></form></section>
 
             <!-- Direct support chat: Android app + this panel only (not the web player panel). Tickets start from the app's intake form (reason/phone/matchId); status flips between unanswered/answered automatically whenever either side sends a message. -->
-            <section id="support-chat-section" class="section">
-                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-                    <h3 class="fw-bold m-0 text-success"><i class="bi bi-chat-dots-fill me-2"></i> Support Chat</h3>
-                    <div class="d-flex align-items-center gap-2 p-2 rounded" style="background:rgba(0,0,0,0.15); border:1px solid var(--border-glass);">
-                        <label class="form-label m-0 fw-bold" for="scEnabledTog">Chat feature enabled</label>
-                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="scEnabledTog"></div>
-                    </div>
-                </div>
-                <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-                    <button type="button" class="btn btn-sm border border-secondary bg-dark" data-tab-tgt="scLatest">Latest</button>
-                    <button type="button" class="btn btn-sm" data-tab-tgt="scUnanswered">Unanswered</button>
-                    <button type="button" class="btn btn-sm" data-tab-tgt="scAnswered">Answered</button>
-                    <button type="button" class="btn btn-sm" data-tab-tgt="scResolved">Resolved</button>
-                    <select class="form-select form-select-sm ms-auto" id="scReasonFilter" style="max-width:220px;">
-                        <option value="">All reasons</option>
-                        <option value="Match Result Issue">Match Result Issue</option>
-                        <option value="Deposit Issue">Deposit Issue</option>
-                        <option value="Withdrawal Issue">Withdrawal Issue</option>
-                        <option value="Account / Login Issue">Account / Login Issue</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                <div class="glass-card p-0"><div id="scList"></div></div>
-            </section>
-
             <section id="staff-management-section" class="section">
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                     <h3 class="fw-bold m-0" style="color: var(--warning);"><i class="bi bi-shield-lock-fill me-2"></i> Staff Management</h3>
@@ -1590,7 +1634,13 @@
          "Confirm & Send Winnings" is clicked. -->
     <div class="modal fade" id="msBulkVerifyModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-success"><i class="bi bi-check2-circle"></i> Bulk Verify & Send Winnings</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="msBulkPreviewBody"></div></div><div class="modal-footer border-glass"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn-premium px-4" id="msBulkConfirmBtn"><i class="bi bi-send-check-fill"></i> Confirm & Send Winnings</button></div></div></div></div>
 
-    <div class="modal fade" id="userScopeModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-primary font-monospace"><i class="bi bi-person-bounding-box me-2"></i> User Profile</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="row g-0 h-100"><div class="col-lg-4 p-4 border-end border-glass" style="background:rgba(0,0,0,0.15);"><div class="text-center mb-4"><img src="" id="usImg" width="100" class="rounded-circle mb-3 border border-primary p-1 bg-dark"><h4 class="fw-bold m-0 text-white" id="usNm">Name</h4><small class="text-info font-monospace d-block mb-1" id="usEm">email</small><small class="text-warning font-monospace d-block mb-1" id="usUname"></small><small class="text-white font-monospace d-block mb-3" id="usPhone"></small><div class="p-2 rounded mb-2 text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">UID: <span id="usUid" class="text-white"></span></div><div class="p-2 rounded text-start font-monospace small mb-2" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Referral Code: <span id="usRef" class="text-warning fw-bold"></span></div><div class="p-2 rounded text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Game ID: <span id="usGame" class="text-info fw-bold"></span></div></div><hr class="border-secondary"><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Deposit Balance</span><strong class="text-white fs-5 font-monospace"><span class="c-sym">₹</span><span id="usDp"></span></strong></div><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Winning Balance</span><strong class="text-success fs-5 font-monospace"><span class="c-sym">₹</span><span id="usWn"></span></strong></div><div class="d-flex justify-content-between mb-5 align-items-center"><span class="text-muted small fw-bold text-uppercase">Bonus Balance</span><strong class="text-warning fs-5 font-monospace"><span class="c-sym">₹</span><span id="usBn"></span></strong></div><button class="btn w-100 fw-bold py-3 text-uppercase border-2" id="usTgBtn" data-action="tg-ban"><i class="bi bi-shield-x"></i> Ban User Account</button></div><div class="col-lg-8 p-0 d-flex flex-column"><div class="p-3 border-bottom border-glass" style="background:rgba(0,0,0,0.2);"><ul class="nav nav-pills gap-2 flex-nowrap" style="overflow-x:auto;" role="tablist"><li class="nav-item"><button class="nav-link active fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabAdj">Edit Balance</button></li><li class="nav-item"><button class="nav-link fw-bold text-danger px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabPush">Push Notification</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabLog">Matches Played</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabTxn">Transaction Ledger</button></li></ul></div><div class="p-4 flex-grow-1 overflow-auto"><div class="tab-content"><div class="tab-pane fade show active" id="tabAdj"><form id="fmAdj"><input type="hidden" id="adId"><div class="row g-4 mb-4"><div class="col-md-6"><label class="form-label text-warning">Amount (Use negative to deduct)</label><input type="number" class="form-control form-control-lg fw-bold font-monospace" id="adV" required placeholder="e.g. 50 or -50"></div><div class="col-md-6"><label class="form-label text-warning">Target Wallet</label><select class="form-select form-select-lg" id="adT" required><option value="balance">Deposit Balance</option><option value="winningCash">Winning Balance</option><option value="bonusCash">Bonus Balance</option></select></div><div class="col-12"><label class="form-label text-warning">Reason for Update (Required)</label><input type="text" class="form-control" id="adR" required placeholder="Refund, penalty, reward..."></div></div><button type="submit" class="btn-premium w-100 py-3"><i class="bi bi-database-fill-exclamation"></i> Update Balance Now</button></form></div><div class="tab-pane fade" id="tabPush"><form id="fmPsh"><div class="mb-4"><label class="form-label text-danger">Saved Templates</label><div class="d-flex gap-2"><select class="form-select" id="psTplPick"><option value="">-- Load a saved template --</option></select><button type="button" class="btn btn-outline-secondary" data-action="save-tpl" data-src="ps" title="Save current title + message as a new template"><i class="bi bi-bookmark-plus"></i></button><button type="button" class="btn btn-outline-danger" data-action="del-tpl" data-src="ps" title="Delete selected template"><i class="bi bi-trash"></i></button></div></div><div class="mb-4"><label class="form-label text-danger">Notification Title</label><input type="text" class="form-control" id="psH" required></div><div class="mb-4"><label class="form-label text-danger">Message</label><textarea class="form-control" id="psM" rows="4" required></textarea></div><div class="mb-4"><label class="form-label text-muted">Image URL (Optional)</label><input type="url" class="form-control" id="psU"></div><button type="submit" class="btn-premium w-100 py-3" style="background:var(--danger);"><i class="bi bi-bell"></i> Send to this user</button></form></div><div class="tab-pane fade" id="tabLog"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Match Name</th><th>Status</th><th>Kills</th><th>Winnings (<span class="c-sym">₹</span>)</th></tr></thead><tbody id="tbUsrLog"></tbody></table></div></div><div class="tab-pane fade" id="tabTxn"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Date & Time</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead><tbody id="tbUsrTxn"></tbody></table></div></div></div></div></div></div></div></div></div></div>
+    <!-- Shared confirm dialog (see UI_CONFIRM in the app script). Native window.confirm() is
+         unreliable across embedded/automated browser contexts -- some auto-dismiss JS dialogs
+         entirely, silently returning false, which makes every confirm()-gated action look broken
+         even though the click handler ran fine. This custom modal replaces every confirm() call in
+         the panel with one that behaves consistently everywhere. -->
+    <div class="modal fade" id="uiConfirmModal" tabindex="-1" data-bs-backdrop="static"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold" id="uiConfirmTitle">Confirm</h5><button type="button" class="btn-close" id="uiConfirmCloseX"></button></div><div class="modal-body"><p class="m-0" id="uiConfirmMsg" style="white-space:pre-line;"></p></div><div class="modal-footer border-glass"><button type="button" class="btn btn-outline-secondary" id="uiConfirmCancelBtn">Cancel</button><button type="button" class="btn btn-danger fw-bold" id="uiConfirmOkBtn">Confirm</button></div></div></div></div>
+    <div class="modal fade" id="userScopeModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-primary font-monospace"><i class="bi bi-person-bounding-box me-2"></i> User Profile</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="row g-0 h-100"><div class="col-lg-4 p-4 border-end border-glass" style="background:rgba(0,0,0,0.15);"><div class="text-center mb-4"><img src="" id="usImg" width="100" class="rounded-circle mb-3 border border-primary p-1 bg-dark"><h4 class="fw-bold m-0 text-white" id="usNm">Name</h4><small class="text-info font-monospace d-block mb-1" id="usEm">email</small><small class="text-warning font-monospace d-block mb-1" id="usUname"></small><small class="text-white font-monospace d-block mb-3" id="usPhone"></small><div class="p-2 rounded mb-2 text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">UID: <span id="usUid" class="text-white"></span></div><div class="p-2 rounded text-start font-monospace small mb-2" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Referral Code: <span id="usRef" class="text-warning fw-bold"></span></div><div class="p-2 rounded text-start font-monospace small" style="background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);">Game ID: <span id="usGame" class="text-info fw-bold"></span></div></div><hr class="border-secondary"><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Deposit Balance</span><strong class="text-white fs-5 font-monospace"><span class="c-sym">₹</span><span id="usDp"></span></strong></div><div class="d-flex justify-content-between mb-3 align-items-center"><span class="text-muted small fw-bold text-uppercase">Winning Balance</span><strong class="text-success fs-5 font-monospace"><span class="c-sym">₹</span><span id="usWn"></span></strong></div><div class="d-flex justify-content-between mb-5 align-items-center"><span class="text-muted small fw-bold text-uppercase">Bonus Balance</span><strong class="text-warning fs-5 font-monospace"><span class="c-sym">₹</span><span id="usBn"></span></strong></div><button class="btn w-100 fw-bold py-3 text-uppercase border-2" id="usTgBtn" data-action="tg-ban"><i class="bi bi-shield-x"></i> Ban User Account</button></div><div class="col-lg-8 p-0 d-flex flex-column"><div class="p-3 border-bottom border-glass" style="background:rgba(0,0,0,0.2);"><ul class="nav nav-pills gap-2 flex-nowrap" style="overflow-x:auto;" role="tablist"><li class="nav-item"><button class="nav-link active fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabAdj">Edit Balance</button></li><li class="nav-item"><button class="nav-link fw-bold text-danger px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabPush">Push Notification</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabLog">Matches Played</button></li><li class="nav-item"><button class="nav-link fw-bold text-white px-4 py-2" data-bs-toggle="tab" data-bs-target="#tabTxn">Transaction Ledger</button></li></ul></div><div class="p-4 flex-grow-1 overflow-auto"><div class="tab-content"><div class="tab-pane fade show active" id="tabAdj"><form id="fmAdj"><input type="hidden" id="adId"><div class="row g-4 mb-4"><div class="col-md-6"><label class="form-label text-warning">Amount (Use negative to deduct)</label><input type="number" class="form-control form-control-lg fw-bold font-monospace" id="adV" required placeholder="e.g. 50 or -50"></div><div class="col-md-6"><label class="form-label text-warning">Target Wallet</label><select class="form-select form-select-lg" id="adT" required><option value="balance">Deposit Balance</option><option value="winningCash">Winning Balance</option><option value="bonusCash">Bonus Balance</option></select></div><div class="col-12"><label class="form-label text-warning">Reason for Update (Required)</label><input type="text" class="form-control" id="adR" required placeholder="Refund, penalty, reward..."></div></div><button type="submit" class="btn-premium w-100 py-3"><i class="bi bi-database-fill-exclamation"></i> Update Balance Now</button></form></div><div class="tab-pane fade" id="tabPush"><form id="fmPsh"><div class="mb-4"><label class="form-label text-danger">Saved Templates</label><div class="d-flex gap-2"><select class="form-select" id="psTplPick"><option value="">-- Load a saved template --</option></select><button type="button" class="btn btn-outline-secondary" data-action="save-tpl" data-src="ps" title="Save current title + message as a new template"><i class="bi bi-bookmark-plus"></i></button><button type="button" class="btn btn-outline-danger" data-action="del-tpl" data-src="ps" title="Delete selected template"><i class="bi bi-trash"></i></button></div></div><div class="mb-4"><label class="form-label text-danger">Notification Title</label><input type="text" class="form-control" id="psH" required></div><div class="mb-4"><label class="form-label text-danger">Message</label><textarea class="form-control" id="psM" rows="4" required></textarea></div><div class="mb-4"><label class="form-label text-muted">Image URL (Optional)</label><input type="url" class="form-control" id="psU"></div><button type="submit" class="btn-premium w-100 py-3" style="background:var(--danger);"><i class="bi bi-bell"></i> Send to this user</button></form></div><div class="tab-pane fade" id="tabLog"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Match Name</th><th>Status</th><th>Kills</th><th>Winnings (<span class="c-sym">₹</span>)</th></tr></thead><tbody id="tbUsrLog"></tbody></table></div></div><div class="tab-pane fade" id="tabTxn"><div class="d-flex justify-content-end mb-3"><select class="form-select form-select-sm w-auto" id="usrTxnFilter"><option value="">All Transactions</option><option value="deposit">Deposits Only</option><option value="withdrawal">Withdrawals Only</option></select></div><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Date & Time</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead><tbody id="tbUsrTxn"></tbody></table></div></div></div></div></div></div></div></div></div></div>
     <div class="modal fade" id="userCreateModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header border-glass"><h5 class="modal-title fw-bold text-primary font-monospace">Add New User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="fmUsCr"><div class="mb-3"><label class="form-label text-primary">Full Name</label><input type="text" class="form-control" id="ucN" required></div><div class="mb-3"><label class="form-label text-primary">Email Address</label><input type="email" class="form-control" id="ucE" required></div><div class="mb-3"><label class="form-label text-primary">Password</label><input type="password" class="form-control" id="ucP" required minlength="6"></div><div class="mb-4"><label class="form-label text-primary">Add Starting Balance (<span class="c-sym">₹</span>)</label><input type="number" class="form-control fw-bold font-monospace" id="ucC" value="0"></div><button type="submit" class="btn-premium w-100 py-3">Create Account</button></form></div></div></div></div>
 
     <div class="modal fade" id="regPModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header border-glass" style="background:rgba(0,0,0,0.4);"><h5 class="modal-title fw-bold text-success font-monospace">Participants: <span id="rpTi" class="text-white"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="table-responsive"><table class="table table-glass mb-0" id="tbRpEx"><thead><tr><th>User Details</th><th>In-Game Details</th><th>Room Slot</th><th>Kills</th><th>Rank</th><th>Action</th></tr></thead><tbody id="tbRpL"></tbody></table></div></div>
@@ -1668,13 +1718,38 @@
          * (the Shadow app is still used only to CREATE Firebase login accounts for new staff/users). */
         let CF_SESSION = localStorage.getItem('px24_admin_token') || null;
 
+        /* BANDWIDTH FIX: cfFetch had zero caching (unlike the Firebase-era fetchWithCache above,
+         * which this replaced) -- staff/settings/modes were each fetched independently by 3-6
+         * different sections every time, with no sharing between them. A short TTL cache keyed by
+         * the request's base path (query string stripped) covers every one of those call sites at
+         * once without touching any of them individually, since they all go through this one
+         * function. Only GETs to this small whitelist are cached -- everything else (matches,
+         * users, deposits, withdrawals, wallet actions, etc.) is untouched and always live, since
+         * those either change too often or are financially sensitive to ever risk staleness on. */
+        const CF_CACHE = {}; // basePath -> { time, data }
+        const CF_CACHE_TTL_MS = { settings: 60000, staff: 60000, modes: 60000 };
         async function cfFetch(path, options = {}) {
+            const method = (options.method || "GET").toUpperCase();
+            const basePath = path.split("?")[0];
+            const cacheable = method === "GET" && basePath in CF_CACHE_TTL_MS;
+            if (cacheable) {
+                const hit = CF_CACHE[basePath];
+                if (hit && (Date.now() - hit.time) < CF_CACHE_TTL_MS[basePath]) return hit.data;
+            }
             const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
             if (CF_SESSION) headers["Authorization"] = `Bearer ${CF_SESSION}`;
             const res = await fetch(CF_BASE + path, { ...options, headers });
             if (res.status === 401) { cfLogout(); throw new Error("Your session has expired. Please log in again."); }
             const json = await res.json();
             if (!json.ok) throw new Error(json.error?.message || `Cloudflare API error (${path})`);
+            if (cacheable) CF_CACHE[basePath] = { time: Date.now(), data: json.data };
+            // Any write to a cacheable path (or a sub-path of it, e.g. PUT staff/{id}) invalidates
+            // that cache entry immediately, so an admin's own edit is never masked by a stale read.
+            if (method !== "GET") {
+                for (const base of Object.keys(CF_CACHE_TTL_MS)) {
+                    if (basePath === base || basePath.startsWith(base + "/")) delete CF_CACHE[base];
+                }
+            }
             return json.data;
         }
         const CF = {
@@ -1721,6 +1796,49 @@
         let cachedAnnouncements = [];
         const E = i => document.getElementById(i) || { value:'', innerHTML:'', textContent:'', style:{}, classList:{add:()=>{},remove:()=>{},toggle:()=>{}}, checked:false, disabled:false, dispatchEvent:()=>{}, options:[], selectedIndex:0 };
         const TS = (m,t='success') => { const c=E('toastContainer'); if(!c) return; const e=document.createElement('div'); e.className=`custom-toast toast-${t}`; e.innerHTML=`<i class="bi bi-${t==='success'?'check-circle':'exclamation-triangle'}-fill fs-4 mt-1"></i> <div class="d-flex flex-column"><strong style="line-height:1.2; font-size:0.9rem;">System Notice</strong><span style="font-size:0.8rem; font-weight:500;" class="text-muted">${m}</span></div>`; c.appendChild(e); requestAnimationFrame(()=>e.classList.add('show')); setTimeout(()=>{ e.classList.remove('show'); setTimeout(()=>e.remove(), 400); }, 3500); };
+
+        /** Replaces every native window.confirm() in this panel -- confirm() is unreliable across
+         *  embedded/automated browser contexts (some silently auto-dismiss JS dialogs, making the
+         *  confirm() call return false without ever showing anything, so a confirm()-gated action
+         *  looks broken even though its click handler ran correctly). Returns a Promise<boolean>,
+         *  same call shape as `if (!confirm(msg)) return;` becomes `if (!await UI_CONFIRM(msg)) return;`.
+         *  Disposes/recreates the bootstrap.Modal instance on every call (same reasoning as
+         *  SHOW_MODAL_CLEAN) so a rapid double-invocation can't leave stale internal state behind. */
+        const UI_CONFIRM = (message, opts = {}) => new Promise((resolve) => {
+            const el = document.getElementById('uiConfirmModal');
+            if (!el) { resolve(window.confirm(message)); return; } // defensive fallback, should never hit
+            E('uiConfirmTitle').textContent = opts.title || 'Confirm';
+            E('uiConfirmMsg').textContent = message;
+            const okBtn = E('uiConfirmOkBtn');
+            okBtn.textContent = opts.confirmText || 'Confirm';
+            okBtn.className = `btn fw-bold ${opts.danger === false ? 'btn-premium' : 'btn-danger'}`;
+
+            const existing = bootstrap.Modal.getInstance(el);
+            if (existing) existing.dispose();
+            const modal = new bootstrap.Modal(el);
+
+            let settled = false;
+            const finish = (result) => {
+                if (settled) return;
+                settled = true;
+                okBtn.removeEventListener('click', onOk);
+                E('uiConfirmCancelBtn').removeEventListener('click', onCancel);
+                E('uiConfirmCloseX').removeEventListener('click', onCancel);
+                el.removeEventListener('hidden.bs.modal', onHidden);
+                resolve(result);
+            };
+            const onOk = () => { modal.hide(); finish(true); };
+            const onCancel = () => { finish(false); };
+            // Backdrop-dismiss / Escape also resolve false -- 'hidden.bs.modal' fires for every close
+            // path, but finish() is a no-op once already settled by onOk/onCancel above.
+            const onHidden = () => finish(false);
+
+            okBtn.addEventListener('click', onOk);
+            E('uiConfirmCancelBtn').addEventListener('click', onCancel);
+            E('uiConfirmCloseX').addEventListener('click', onCancel);
+            el.addEventListener('hidden.bs.modal', onHidden);
+            modal.show();
+        });
 
         window.UI = window.UI || {}; window.UI.showToast = TS;
         window.copyToCb = (txt) => { navigator.clipboard.writeText(txt).then(() => TS('Copied to clipboard!', 'success')).catch(() => TS('Copy failed', 'error')); };
@@ -1866,7 +1984,7 @@
                 else if(s==='redeem-codes-section') r=['rdm_mgt']; else if(s==='coupons-section') r=['coup_mgt'];
                 else if(s==='referrals-section' || s==='demo-link-section' || s==='promo-codes-section') r=['ref_mgt'];
                 else if(s==='withdrawals-section') r=['wd_appr']; else if(s==='deposit-section' || s==='zapupi-status-section') r=['dep_appr'];
-                else if(s==='users-section') r=['user_mgt']; else if(s==='tutorials-section' || s==='support-manager-section' || s==='support-chat-section' || s==='language-section') r=['sup_mgt'];
+                else if(s==='users-section') r=['user_mgt']; else if(s==='tutorials-section' || s==='support-manager-section' || s==='language-section') r=['sup_mgt'];
                 else if(s==='notifications-section') r=['notif_mgt']; else if(s==='theme-section') r=['theme_mgt'];
                 else if(s==='settings-section') r=['sys_set', 'currency_mgt']; else if(s==='smart-activity-section') r=['sys_set']; else if(s==='staff-management-section') r=['staff_mgt'];
                 else if(s==='hosts-section') r=['staff_mgt','host_mgt'];
@@ -1888,7 +2006,7 @@
             else if(id==='redeem-codes-section') r=['rdm_mgt']; else if(id==='coupons-section') r=['coup_mgt'];
             else if(id==='referrals-section' || id==='demo-link-section' || id==='promo-codes-section') r=['ref_mgt'];
             else if(id==='withdrawals-section') r=['wd_appr']; else if(id==='deposit-section' || id==='zapupi-status-section') r=['dep_appr'];
-            else if(id==='users-section') r=['user_mgt']; else if(id==='tutorials-section' || id==='support-manager-section' || id==='support-chat-section' || id==='language-section') r=['sup_mgt'];
+            else if(id==='users-section') r=['user_mgt']; else if(id==='tutorials-section' || id==='support-manager-section' || id==='language-section') r=['sup_mgt'];
             else if(id==='notifications-section') r=['notif_mgt']; else if(id==='theme-section') r=['theme_mgt'];
             else if(id==='settings-section') r=['sys_set', 'currency_mgt']; else if(id==='smart-activity-section') r=['sys_set']; else if(id==='staff-management-section') r=['staff_mgt']; else if(id==='hosts-section') r=['staff_mgt','host_mgt'];
             else if(id==='staff-logs-section') r=['staff_logs']; else if(id==='match-logs-section') r=['match_logs', 'match_edit'];
@@ -1957,8 +2075,16 @@
                         if (E('announcements-section')?.classList.contains('active')) RenderAnnouncements();
                     } catch(e) {}
                 };
-                refreshBadges(); loadAnnouncementsCF();
-                setInterval(() => { refreshBadges(); loadAnnouncementsCF(); }, 60000);
+                // BANDWIDTH FIX: this ran unconditionally every 60s even while the browser tab was
+                // backgrounded/minimized (an admin commonly leaves the panel open in a spare tab all
+                // day) -- 5 GETs/minute for zero visible benefit while hidden. Now paused via the
+                // Page Visibility API: no interval runs while document.hidden, and switching back
+                // triggers one immediate refresh so badges/announcements are never stale on return.
+                let badgePollTimer = null;
+                const startBadgePoll = () => { if (badgePollTimer) return; refreshBadges(); loadAnnouncementsCF(); badgePollTimer = setInterval(() => { refreshBadges(); loadAnnouncementsCF(); }, 60000); };
+                const stopBadgePoll = () => { if (badgePollTimer) { clearInterval(badgePollTimer); badgePollTimer = null; } };
+                document.addEventListener('visibilitychange', () => { if (document.hidden) stopBadgePoll(); else startBadgePoll(); });
+                if (!document.hidden) startBadgePoll();
             } else {
                 onValue(query(ref(rd,'withdrawals'),orderByChild('status'),equalTo('pending')), p => {
                     const userPending = p.exists() ? p.size : 0;
@@ -2188,7 +2314,6 @@
                  * not an ongoing sync). Reading via RX_SC_CF here would make staff permanently blind to
                  * every new ticket -- the exact half-flip risk already avoided for the View Users modal
                  * and Bulk Verify. Revisit once Player app ticket creation is also ported to Cloudflare. */
-                else if(id==='support-chat-section') { E('scEnabledTog').checked = SET.supportChatEnabled !== false; if(CF_LIVE) await RX_SC_CF(); else await RX_SC(); }
                 else if(id==='notifications-section') { if(CF_LIVE) { await RX_NT_CF(); await RX_NT_HOST_CF(); await RENDER_NT_PICKERS_CF(); await RX_SCHED_NOTIF_CF(); } else { await RX_NT(); await RX_NT_HOST(); await RENDER_NT_PICKERS(); } }
             });
         };
@@ -2199,10 +2324,8 @@
                 if(tg.startsWith('wd')) { if(tg==='wdPending') CUR_WD_STATUS = 'pending'; else if(tg==='wdComplete') CUR_WD_STATUS = 'completed'; else if(tg==='wdReject') CUR_WD_STATUS = 'rejected'; if(CF_LIVE) await RX_WD_CF(); else await RX_WD(); }
                 else if(tg==='dpPending') { if(CF_LIVE) await RX_DP_CF('pending'); else await RX_DP('pending'); } else if(tg==='dpSuccess') { if(CF_LIVE) await RX_DP_CF('success'); else await RX_DP('success'); } else if(tg==='dpFailed') { if(CF_LIVE) await RX_DP_CF('failed'); else await RX_DP('failed'); } else if(tg==='dpStuck') { await RX_ZAP_STUCK(); }
                 else if(tg==='refPending') { if(CF_LIVE) await RX_RF_CF('pending'); else await RX_RF('pending'); } else if(tg==='refComplete') { if(CF_LIVE) await RX_RF_CF('completed'); else await RX_RF('completed'); }
-                else if(tg==='scLatest') { CUR_SC_TAB = 'latest'; RENDER_SC(); } else if(tg==='scUnanswered') { CUR_SC_TAB = 'unanswered'; RENDER_SC(); } else if(tg==='scAnswered') { CUR_SC_TAB = 'answered'; RENDER_SC(); } else if(tg==='scResolved') { CUR_SC_TAB = 'resolved'; RENDER_SC(); }
             }, b);
         }));
-        E('scReasonFilter')?.addEventListener('change', e => { CUR_SC_REASON = e.target.value; RENDER_SC(); });
         document.querySelectorAll('.wd-toggle-btn').forEach(b => b.addEventListener('click', e => { document.querySelectorAll('.wd-toggle-btn').forEach(x => { x.classList.remove('active'); x.classList.add('text-info'); }); b.classList.add('active'); b.classList.remove('text-info'); CUR_WD_TYPE = b.dataset.wdType; A_EX(async () => { if(CF_LIVE) await RX_WD_CF(); else await RX_WD(); }, b); }));
 
         if(E('btnRefreshSection')) {
@@ -3099,7 +3222,34 @@
          * section (or any write that calls RX_TR_CF directly) refetches. */
         let TR_CF_SNAPSHOT = null;
 
-        const RX_TR_CF = async (reuseSnapshot = false) => {
+        const MATCHES_PAGE_SIZE = 25;
+        let matchesOffset = 0, matchesHasMore = false;
+
+        /* BANDWIDTH FIX (p6 spec): GET /admin/matches used to return every match ever created on
+         * every Matches-List visit. It now takes limit/offset (backward compatible -- omitted means
+         * unbounded, which is what every OTHER caller, e.g. the Host app, still relies on) and this
+         * loader pages through it. `staff` is still fetched in full (small table, needed to resolve
+         * every host name shown in the list) -- not part of this fix.
+         * BUG FIX 2026-08-02: `offset` was being sent here all along but the SERVER never actually
+         * read or applied it (listTournamentsFiltered had no OFFSET clause) -- every "Load More"
+         * click silently re-fetched and duplicated page 1 instead of advancing. Fixed server-side
+         * (src/db/tournaments.ts); confirmed live (was 50 rows / 25 unique before the fix).
+         * Also added server-side `search` (matchUniqueId/id/name) so the search box below actually
+         * reaches matches beyond whatever's currently loaded, instead of silently only searching
+         * the loaded subset (confirmed live: searching a term with zero loaded matches used to fire
+         * no network request at all and just say "not found").
+         *
+         * action controls what happens, since "reload after a filter change" and "fetch the next
+         * page" and "fresh section open" are three genuinely different operations:
+         *   'reset'    -- fresh paginated fetch from offset 0 (section open, search term changed,
+         *                 or after a create/edit/delete mutation). Refetches staff too.
+         *   'more'     -- Load More: fetches the next page and appends it onto the snapshot.
+         *   'rerender' -- a non-search filter changed (see RELOAD_TR) -- no network call at all,
+         *                 just re-runs the filter/sort/render logic over whatever's already loaded
+         *                 (status/mode/quick/date filters still apply to the loaded subset only,
+         *                 same trade-off as Users -- only search itself was worth making
+         *                 server-side, since it's the one meant to find a specific match). */
+        const RX_TR_CF = async (action = 'reset') => {
             try {
                 if(!Object.keys(GC).length) await RX_GA_CF().catch(()=>{});
                 if(!Object.keys(MC).length && document.getElementById('modes-section')) {
@@ -3111,20 +3261,31 @@
 
             try {
                 let staffMap, allMatches;
-                if (reuseSnapshot && TR_CF_SNAPSHOT) {
+                if (action === 'rerender' && TR_CF_SNAPSHOT) {
                     ({ staffMap, allMatches } = TR_CF_SNAPSHOT);
                 } else {
-                    const data = await CF.get('admin/matches');
-                    const staffData = await CF.get('staff');
-                    staffMap = {};
-                    (staffData.staff || []).forEach(st => { staffMap[st.userId] = st.name; });
+                    if (action === 'reset') { matchesOffset = 0; TR_CF_SNAPSHOT = null; }
+                    const qs = new URLSearchParams({ limit: MATCHES_PAGE_SIZE, offset: matchesOffset });
+                    const searchTermForFetch = (E('tmlSearchInput')?.value || '').trim();
+                    if (searchTermForFetch) qs.set('search', searchTermForFetch);
+                    const [data, staffData] = await Promise.all([
+                        CF.get(`admin/matches?${qs.toString()}`),
+                        action === 'reset' ? CF.get('staff') : Promise.resolve(null),
+                    ]);
+                    staffMap = action === 'reset' ? {} : { ...(TR_CF_SNAPSHOT?.staffMap || {}) };
+                    if (staffData) (staffData.staff || []).forEach(st => { staffMap[st.userId] = st.name; });
 
-                    allMatches = (data.matches || []).map(t => ({
+                    const newRows = (data.matches || []).map(t => ({
                         ...t, entryFee: P2R(t.entryFee), prizePool: P2R(t.prizePool), perKillPrize: P2R(t.killReward),
                         maxPlayers: t.totalSlots, registeredPlayers: null, registeredCount: t.registeredCount,
                     }));
+                    matchesHasMore = !!data.hasMore;
+                    matchesOffset += (data.matches || []).length;
+
+                    allMatches = action === 'reset' ? newRows : [...(TR_CF_SNAPSHOT?.allMatches || []), ...newRows];
                     if(window.C_ROLE === 'Host') allMatches = allMatches.filter(t => t.hostId === C_U.uid);
                     TR_CF_SNAPSHOT = { staffMap, allMatches };
+                    const wrap = E('matchesLoadMoreWrap'); if (wrap) wrap.style.display = matchesHasMore ? '' : 'none';
                 }
                 let matches = allMatches.slice();
 
@@ -3166,7 +3327,13 @@
 
                 if (E('tmlResultCount')) {
                     const filterActive = searchTerm || statusFilterVal || modeFilterVal || quickFilterVal || timeFromVal || timeToVal;
-                    E('tmlResultCount').innerHTML = filterActive ? `<small class="text-info"><i class="bi bi-funnel-fill"></i> Showing ${matches.length} match(es) matching your filter.</small>` : '';
+                    if (!filterActive) {
+                        E('tmlResultCount').innerHTML = '';
+                    } else {
+                        // Filters only apply to whatever pages have been loaded so far (see RX_TR_CF) --
+                        // said honestly instead of implying it searched the whole table.
+                        E('tmlResultCount').innerHTML = `<small class="text-info"><i class="bi bi-funnel-fill"></i> Showing ${matches.length} of ${allMatches.length} loaded match(es)${matchesHasMore ? ' (more available -- Load More to search further)' : ''}.</small>`;
+                    }
                 }
 
                 const html = matches
@@ -3216,23 +3383,29 @@
          * filter it re-rendered from Firebase, which the panel no longer authenticates to: the
          * list reverted to stale Firebase data with none of the newly created matches in it.
          * Same class of miss as the users-section loader fixed on 2026-07-27. */
-        const RELOAD_TR = () => (CF_LIVE ? RX_TR_CF(true) : RX_TR());
+        const RELOAD_TR = () => (CF_LIVE ? RX_TR_CF('rerender') : RX_TR());
+        // Search is different from the other filters below: it needs a real server round-trip
+        // ('reset', not 'rerender') so it can reach matches beyond whatever pages happen to be
+        // loaded already -- see RX_TR_CF's own comment for the bug this fixes.
+        const RELOAD_TR_SEARCH = () => (CF_LIVE ? RX_TR_CF('reset') : RX_TR());
         let tmlSearchDebounce = null;
-        if (E('tmlSearchInput')) E('tmlSearchInput').addEventListener('input', () => { clearTimeout(tmlSearchDebounce); tmlSearchDebounce = setTimeout(() => RELOAD_TR(), 250); });
+        if (E('tmlSearchInput')) E('tmlSearchInput').addEventListener('input', () => { clearTimeout(tmlSearchDebounce); tmlSearchDebounce = setTimeout(() => RELOAD_TR_SEARCH(), 300); });
         if (E('tmlStatusFilter')) E('tmlStatusFilter').addEventListener('change', () => RELOAD_TR());
         if (E('tmlModeFilter')) E('tmlModeFilter').addEventListener('change', () => RELOAD_TR());
         if (E('tmlQuickFilter')) E('tmlQuickFilter').addEventListener('change', () => RELOAD_TR());
         if (E('tmlTimeFrom')) E('tmlTimeFrom').addEventListener('change', () => RELOAD_TR());
         if (E('tmlTimeTo')) E('tmlTimeTo').addEventListener('change', () => RELOAD_TR());
         if (E('tmlClearFilters')) E('tmlClearFilters').addEventListener('click', () => {
+            const hadSearch = (E('tmlSearchInput')?.value || '').trim().length > 0;
             if (E('tmlSearchInput')) E('tmlSearchInput').value = '';
             if (E('tmlStatusFilter')) E('tmlStatusFilter').value = '';
             if (E('tmlModeFilter')) E('tmlModeFilter').value = '';
             if (E('tmlQuickFilter')) E('tmlQuickFilter').value = '';
             if (E('tmlTimeFrom')) E('tmlTimeFrom').value = '';
             if (E('tmlTimeTo')) E('tmlTimeTo').value = '';
-            RELOAD_TR();
+            hadSearch ? RELOAD_TR_SEARCH() : RELOAD_TR();
         });
+        if (E('matchesLoadMoreBtn')) E('matchesLoadMoreBtn').addEventListener('click', () => A_EX(() => RX_TR_CF('more'), E('matchesLoadMoreBtn')));
 
         E('trG').onchange = async (e) => {
             const gid = e.target.value; const mdCat = E('trMdCat'); mdCat.innerHTML = '<option value="">Loading Modes...</option>';
@@ -3548,6 +3721,7 @@
                 window.MS_STATE[tab].slots = data.slots || [];
             }
             renderMsSlotList();
+            await refreshMsCoverage();
         };
         const saveMsSlotsCF = async () => {
             if (!CHK_P('match_add') && !CHK_P('match_edit')) { TS('Unauthorized', 'error'); return false; }
@@ -3557,11 +3731,97 @@
         const setSchedulerEnabledCF = async (enabled) => { return await CF.put('scheduler-state', { enabled }); };
         const generateNowCF = async () => { return await CF.post('scheduler/generate-now'); };
 
+        /* Partial time-range generation (p7 spec). GET /scheduler/coverage is small/indexed (never
+         * scans tournaments -- see handlers/matchAdmin.ts's handleGetSchedulerCoverage) and always
+         * reflects TODAY's schedule (weekday/sunday, same day-of-week derivation the whole-day
+         * generator itself uses) -- not whichever tab (MS_ACTIVE_TAB) happens to be open in the slot
+         * editor above, since generation always targets today regardless of which tab you're viewing. */
+        const fmtIstTime = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+        const istHHMM = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
+
+        let MS_COVERAGE = null;
+
+        const renderMsCoverageBar = () => {
+            const bar = E('msCoverageBar'); const legend = E('msCoverageLegend');
+            if (!bar || !MS_COVERAGE) return;
+            const { overallStart, overallEnd, generated } = MS_COVERAGE;
+            if (overallStart === null || overallEnd === null) {
+                bar.innerHTML = ''; legend.innerHTML = '<span class="text-muted">No enabled slots configured for today\'s schedule.</span>';
+                return;
+            }
+            const span = overallEnd - overallStart;
+            bar.innerHTML = generated.map(g => {
+                const left = ((g.from - overallStart) / span) * 100;
+                const width = ((g.until - g.from) / span) * 100;
+                return `<div title="${fmtIstTime(g.from)} - ${fmtIstTime(g.until)} (${g.createdCount} match(es))" style="position:absolute; left:${left}%; width:${width}%; top:0; bottom:0; background:var(--success); opacity:0.85;"></div>`;
+            }).join('');
+            const coveredMs = generated.reduce((sum, g) => sum + (g.until - g.from), 0);
+            const pct = span > 0 ? Math.round((coveredMs / span) * 100) : 0;
+            legend.innerHTML = `<i class="bi bi-square-fill text-success"></i> Generated (${pct}%) &nbsp; <i class="bi bi-square text-muted"></i> Remaining &nbsp;&middot;&nbsp; Schedule window: ${fmtIstTime(overallStart)} - ${fmtIstTime(overallEnd)}`;
+        };
+
+        /** "Generate a Time Range" (and "Generate Today's Matches Now" above it, and the automatic
+         *  cron) always target TODAY's actual weekday/sunday schedule -- never whichever tab happens
+         *  to be open. Makes that explicit and flags it loudly when the open tab doesn't match today,
+         *  which is exactly the scenario that looked like a bug: right after midnight IST, "today"
+         *  flips to Sunday while the panel still defaults to showing the Weekday tab. */
+        const renderMsTodayScheduleNote = () => {
+            const el = E('msTodayScheduleNote');
+            if (!el || !MS_COVERAGE) { if (el) el.innerHTML = ''; return; }
+            const todayKey = MS_COVERAGE.scheduleKey; // 'weekday' | 'sunday', as computed server-side
+            const todayLabel = todayKey === 'sunday' ? 'Sunday' : 'Weekday (Mon–Sat)';
+            const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+            if (MS_ACTIVE_TAB === todayKey) {
+                el.innerHTML = `<span class="text-muted"><i class="bi bi-info-circle"></i> Targets today's schedule -- <strong class="text-info">${todayLabel}</strong> (today is ${dayName}, IST).</span>`;
+            } else {
+                el.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle-fill"></i> You're viewing the <strong>${MS_ACTIVE_TAB === 'sunday' ? 'Sunday' : 'Weekday'}</strong> tab, but generation always targets <strong>today's</strong> schedule -- <strong class="text-info">${todayLabel}</strong> (today is ${dayName}, IST). Switch tabs below to edit today's slots.</span>`;
+            }
+        };
+
+        const refreshMsCoverage = async () => {
+            try {
+                MS_COVERAGE = await CF.get('scheduler/coverage');
+            } catch (e) {
+                MS_COVERAGE = null;
+            }
+            renderMsTodayScheduleNote();
+            if (E('msOverallRangeTxt')) {
+                E('msOverallRangeTxt').textContent = (MS_COVERAGE && MS_COVERAGE.overallStart !== null)
+                    ? `${fmtIstTime(MS_COVERAGE.overallStart)} - ${fmtIstTime(MS_COVERAGE.overallEnd)}` : '--';
+            }
+            // Restrict the pickers to the configured overall schedule (p7: "the admin must not be
+            // able to generate 8 AM -> 11 PM" outside a 10 AM-10 PM schedule) -- a client-side
+            // convenience only; POST /scheduler/generate-range re-validates this server-side
+            // regardless, since the frontend restriction alone is never trusted.
+            if (MS_COVERAGE && MS_COVERAGE.overallStart !== null) {
+                const minT = istHHMM(MS_COVERAGE.overallStart), maxT = istHHMM(MS_COVERAGE.overallEnd);
+                if (E('msRangeFrom')) { E('msRangeFrom').min = minT; E('msRangeFrom').max = maxT; if (!E('msRangeFrom').value) E('msRangeFrom').value = minT; }
+                if (E('msRangeUntil')) { E('msRangeUntil').min = minT; E('msRangeUntil').max = maxT; }
+            }
+            renderMsCoverageBar();
+        };
+
+        if (E('msGenerateRangeBtn')) E('msGenerateRangeBtn').addEventListener('click', () => A_EX(async () => {
+            if (!CHK_P('match_add')) return TS('Unauthorized', 'error');
+            const from = E('msRangeFrom')?.value, until = E('msRangeUntil')?.value;
+            if (!from || !until) return TS('Pick both a Generate From and Generate Until time.', 'error');
+            try {
+                const res = await CF.post('scheduler/generate-range', { generateFrom: from, generateUntil: until });
+                LOG_ACT('match', 'Generated Scheduled Matches (Range)', `${from}-${until} -> ${res.created} match(es), ${res.scheduleKey}`);
+                TS(res.created > 0 ? `Generated ${res.created} match(es) for ${from}-${until}.` : 'No matching slot occurrences in that range.', 'success');
+                CLR_CACHE('tournaments');
+                await refreshMsCoverage();
+            } catch (e) {
+                TS(e.message || 'Range generation failed', 'error');
+            }
+        }, E('msGenerateRangeBtn')));
+
         document.querySelectorAll('[data-ms-tab]').forEach(btn => btn.addEventListener('click', () => {
             document.querySelectorAll('[data-ms-tab]').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             MS_ACTIVE_TAB = btn.dataset.msTab;
             renderMsSlotList();
+            renderMsTodayScheduleNote();
         }));
 
         /* CUTOVER 2026-07-24: writes through setSchedulerEnabledCF (PUT /scheduler-state) instead
@@ -3584,7 +3844,7 @@
          * Cloud Function. */
         if (E('msGenerateNowBtn')) E('msGenerateNowBtn').addEventListener('click', () => A_EX(async () => {
             if (!CHK_P('match_add')) return TS('Unauthorized', 'error');
-            if (!confirm("Generate TODAY's scheduled matches right now?\n\nUse this to test a schedule before trusting it to run automatically overnight. If today's automatic run already fired, this WILL create a duplicate batch of matches for today.")) return;
+            if (!await UI_CONFIRM("Generate TODAY's scheduled matches right now?\n\nUse this to test a schedule before trusting it to run automatically overnight. If today's automatic run already fired, this WILL create a duplicate batch of matches for today.")) return;
             try {
                 const res = CF_LIVE ? await generateNowCF() : await callFn('generateScheduledMatchesNow', {});
                 LOG_ACT('match', 'Manually Triggered Match Scheduler', `Created: ${res.created || 0} (${res.scheduleKey || '?'})`);
@@ -3781,13 +4041,61 @@
 
         /* CF sibling (Wave 2) -- reuses GET /admin/matches (already authorizes staff via
          * requireAnyStaff), client-filtered/sorted exactly like the original. Money fields
-         * (prizePool/perKillPrize) convert paise->rupees via P2R for FMT_C/display parity. */
+         * (prizePool/perKillPrize) convert paise->rupees via P2R for FMT_C/display parity.
+         * BANDWIDTH FIX 2026-08-02: was pulling every match ever created (no filter) just to
+         * immediately throw away everything except ongoing/completed/result below (confirmed via
+         * `wrangler d1 insights` as the single biggest D1 read consumer app-wide, ~1M rows/week --
+         * this ran on every single visit to Match Results). The server already supports a `status`
+         * filter (see listTournamentsFiltered) -- ask for exactly the 3 statuses this screen ever
+         * shows instead of downloading and discarding the rest.
+         * Even scoped to those 3 statuses, "completed" only ever grows -- it never shrinks back
+         * out of the fetch, so this would slowly regrow into a full-table pull again over months.
+         * tmResultWindowFilter (default: last 2 days, the real working window for entering
+         * results) also bounds the fetch server-side via `since`; anything older is still reachable
+         * through Search Match by #ID, which does its own unbounded indexed lookup. */
         let TM_CF_SNAPSHOT = null;
         const RX_TM_CF = async (reuseSnapshot = false) => {
             try {
+                // Search Match by ID overrides everything else on this screen: an exact, unbounded
+                // server lookup (not a filter over the fetched/windowed snapshot), so it narrows
+                // "Matches Matching Filter" down to just that one match -- click it to open it,
+                // same as any other card -- instead of the usual Time Window/status/quick/date set.
+                // '#' is optional either way (normalized server-side too, see handlers/search.ts).
+                const idSearchTerm = (E('tmMatchSearchInput')?.value || '').trim();
+                if (idSearchTerm) {
+                    let match = null;
+                    try {
+                        const bare = idSearchTerm.replace(/^#/, '');
+                        const found = await CF.get(`admin/search?q=${encodeURIComponent(bare)}`);
+                        match = (found.matches || [])[0] || null;
+                    } catch(e) {}
+                    const currentId = E('computationTargetSelect').value;
+                    if (match) {
+                        const m = { ...match, prizePool: P2R(match.prizePool) };
+                        const isSelected = m.id === currentId;
+                        const statusColor = m.status==='completed'?'success':(m.status==='ongoing'?'warning':(m.status==='result'?'info':'secondary'));
+                        E('tmResultMatchList').innerHTML = `<div class="glass-card p-3 d-flex justify-content-between align-items-center flex-wrap gap-2" style="cursor:pointer;${isSelected ? 'border-color:var(--accent-primary);' : ''}" data-action="sel-result-match" data-id="${m.id}">
+                            <div><strong class="text-white">${m.name || 'Match'}</strong> <span class="badge bg-dark border border-secondary text-warning">${m.matchUniqueId||''}</span>${isSelected ? ' <span class="badge bg-primary">Selected</span>' : ''}<br><small class="text-muted">${DT(m.startTime)}</small></div>
+                            <div class="d-flex align-items-center gap-3"><span class="text-success fw-bold font-monospace">${FMT_C(m.prizePool)}</span><span class="badge-premium badge-${statusColor}">${(m.status||'').toUpperCase()}</span></div>
+                        </div>`;
+                        E('computationTargetSelect').innerHTML = `<option value="">Select Target Match...</option><option value="${m.id}">${m.matchUniqueId ? m.matchUniqueId+' - ' : ''}${m.name||'Match'} [${(m.status||'').toUpperCase()}]</option>`;
+                        if (isSelected) E('computationTargetSelect').value = m.id;
+                    } else {
+                        E('tmResultMatchList').innerHTML = '<p class="text-muted text-center py-3 mb-0">No match found for that ID.</p>';
+                        E('computationTargetSelect').innerHTML = '<option value="">Select Target Match...</option>';
+                    }
+                    if (E('tmResultFilterCount')) E('tmResultFilterCount').innerHTML = `<small class="text-info"><i class="bi bi-search"></i> Showing search result for "${ESC(idSearchTerm)}".</small>`;
+                    return;
+                }
+
                 let data;
                 if (reuseSnapshot && TM_CF_SNAPSHOT) data = TM_CF_SNAPSHOT;
-                else { data = await CF.get('admin/matches'); TM_CF_SNAPSHOT = data; }
+                else {
+                    const windowDays = Number(E('tmResultWindowFilter')?.value) || 2;
+                    const since = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+                    data = await CF.get(`admin/matches?status=ongoing,completed,result&since=${since}`);
+                    TM_CF_SNAPSHOT = data;
+                }
                 let h='<option value="">Select Target Match...</option>';
                 const statusFilterVal = E('tmResultStatusFilter')?.value || '';
                 const quickFilterVal = E('tmResultQuickFilter')?.value || '';
@@ -3898,6 +4206,7 @@
 
             window.currentMatchData = {
                 id: tid, name: tournament.name, matchUniqueId: tournament.matchUniqueId, status: tournament.status,
+                startTime: tournament.startTime,
                 entryFee: P2R(tournament.entryFee), prizePool: P2R(tournament.prizePool), perKillPrize: P2R(tournament.killReward),
                 prizeList: Object.fromEntries(Object.entries(tournament.prizeTable || {}).map(([rank, amt]) => [rank, P2R(amt)])),
                 maxPlayers: tournament.totalSlots, isTeamMode: tournament.teamMode, teamSize: tournament.teamSize,
@@ -3928,7 +4237,10 @@
                     : '';
                 E('tmMatchHeaderCard').innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-                        <h5 class="fw-bold text-white mb-0">${m.name || 'Match'} <span class="badge bg-dark border border-secondary text-warning fs-6">${m.matchUniqueId || ''}</span></h5>
+                        <div>
+                            <h5 class="fw-bold text-white mb-0">${m.name || 'Match'} <span class="badge bg-dark border border-secondary text-warning fs-6">${m.matchUniqueId || ''}</span></h5>
+                            <small class="text-muted font-monospace">${DT(m.startTime)}</small>
+                        </div>
                         <span class="badge-premium badge-${m.status === 'completed' ? 'success' : (m.status === 'ongoing' ? 'warning' : (m.status === 'result' ? 'info' : 'secondary'))}">${(m.status || '').toUpperCase()}</span>
                     </div>
                     <div class="row g-3 text-center mb-2">
@@ -4117,16 +4429,28 @@
         // Same cutover miss as the Matches List filters above: these called the Firebase RX_TM
         // unconditionally, so filtering the Result Management list fell back to Firebase data.
         const RELOAD_TM = () => (CF_LIVE ? RX_TM_CF(true) : RX_TM());
+        // Unlike the filters above (pure client-side re-filtering of an already-fetched snapshot),
+        // changing the Time Window changes what's actually fetched from the server -- needs a real
+        // refetch (reuseSnapshot=false), not a rerender.
+        const RELOAD_TM_WINDOW = () => (CF_LIVE ? RX_TM_CF(false) : RX_TM());
+        if (E('tmResultWindowFilter')) E('tmResultWindowFilter').addEventListener('change', RELOAD_TM_WINDOW);
         if (E('tmResultStatusFilter')) E('tmResultStatusFilter').addEventListener('change', RELOAD_TM);
         if (E('tmResultQuickFilter')) E('tmResultQuickFilter').addEventListener('change', RELOAD_TM);
         if (E('tmResultDateFrom')) E('tmResultDateFrom').addEventListener('change', RELOAD_TM);
         if (E('tmResultDateTo')) E('tmResultDateTo').addEventListener('change', RELOAD_TM);
+        // Clearing the search box (not just Clear Filters below) reverts to the normal filtered
+        // list -- otherwise the last search result would keep overriding every other filter
+        // indefinitely, even after the admin has deleted what they typed.
+        if (E('tmMatchSearchInput')) E('tmMatchSearchInput').addEventListener('input', (e) => { if (!e.target.value.trim()) RELOAD_TM_WINDOW(); });
         if (E('tmResultClearFilters')) E('tmResultClearFilters').addEventListener('click', () => {
+            if (E('tmMatchSearchInput')) E('tmMatchSearchInput').value = '';
             if (E('tmResultStatusFilter')) E('tmResultStatusFilter').value = '';
             if (E('tmResultQuickFilter')) E('tmResultQuickFilter').value = '';
             if (E('tmResultDateFrom')) E('tmResultDateFrom').value = '';
             if (E('tmResultDateTo')) E('tmResultDateTo').value = '';
-            RELOAD_TM();
+            const windowChanged = E('tmResultWindowFilter') && E('tmResultWindowFilter').value !== '2';
+            if (E('tmResultWindowFilter')) E('tmResultWindowFilter').value = '2';
+            windowChanged ? RELOAD_TM_WINDOW() : RELOAD_TM();
         });
 
         // ---------------------------------------------------------------------------
@@ -4261,40 +4585,19 @@
         }, E('msBulkConfirmBtn')));
 
         if(E('btnSearchMatchById')) {
-            E('btnSearchMatchById').addEventListener('click', async () => {
+            /* MOVED into RX_TM_CF 2026-08-02 (see its own comment) for the CF_LIVE path -- this
+             * handler now just triggers a fresh RX_TM_CF() run, which checks tmMatchSearchInput
+             * itself and renders the result into "Matches Matching Filter" (click the card to open
+             * it) instead of jumping straight into the computation area. Enter key does the same.
+             * The legacy Firebase branch below is unchanged/untouched (CF_LIVE is always true in
+             * production, so this only matters for a hypothetical non-CF_LIVE run). */
+            const runIdSearch = async () => {
                 const term = E('tmMatchSearchInput').value.trim().toLowerCase();
                 if(!term) return TS("Enter Match ID to search", "warning");
+                if (CF_LIVE) { LD(true); await RX_TM_CF(); LD(false); return; }
 
                 LD(true);
                 try {
-                    /* CUTOVER BUG (fixed 2026-07-31): this search read fetchWithCache('tournaments')
-                     * — a Firebase read — with no CF_LIVE branch, so once the panel stopped
-                     * authenticating to Firebase it found nothing and ALWAYS said "Match not found",
-                     * even though the very same match was searchable in the Matches List (which reads
-                     * admin/matches). Search the Cloudflare match set now. Fetched fresh so a match
-                     * created after the section last loaded is still found. The '#'-prefix is
-                     * optional in the query — '#1065' and '1065' both match. */
-                    if(CF_LIVE) {
-                        const data = await CF.get('admin/matches');
-                        const bare = term.replace(/^#/, '');
-                        const match = (data.matches || []).find(t => {
-                            const mu = (t.matchUniqueId || '').toLowerCase();
-                            return mu === term || mu.replace(/^#/, '') === bare || (t.id || '').toLowerCase() === term;
-                        });
-                        if(match) {
-                            const select = E('computationTargetSelect');
-                            if(!Array.from(select.options).some(o => o.value === match.id)) {
-                                select.add(new Option(`${match.matchUniqueId ? match.matchUniqueId+' - ' : ''}${match.name||'Match'} [${(match.status||'').toUpperCase()}]`, match.id));
-                            }
-                            select.value = match.id;
-                            select.dispatchEvent(new Event('change'));
-                            TS("Match loaded successfully!", "success");
-                        } else {
-                            TS("Match not found!", "error");
-                        }
-                        LD(false);
-                        return;
-                    }
                     const s = await fetchWithCache('tournaments');
                     let foundId = null;
                     if(s.exists()){
@@ -4324,7 +4627,9 @@
                     TS("Error searching for match", "error");
                 }
                 LD(false);
-            });
+            };
+            E('btnSearchMatchById').addEventListener('click', runIdSearch);
+            E('tmMatchSearchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') runIdSearch(); });
         }
 
         window.RenderMatchResults = () => {
@@ -4518,7 +4823,10 @@
                         : '';
                     E('tmMatchHeaderCard').innerHTML = `
                         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-                            <h5 class="fw-bold text-white mb-0">${m.name || 'Match'} <span class="badge bg-dark border border-secondary text-warning fs-6">${m.matchUniqueId || ''}</span></h5>
+                            <div>
+                                <h5 class="fw-bold text-white mb-0">${m.name || 'Match'} <span class="badge bg-dark border border-secondary text-warning fs-6">${m.matchUniqueId || ''}</span></h5>
+                                <small class="text-muted font-monospace">${DT(m.startTime)}</small>
+                            </div>
                             <span class="badge-premium badge-${m.status === 'completed' ? 'success' : (m.status === 'ongoing' ? 'warning' : (m.status === 'result' ? 'info' : 'secondary'))}">${(m.status || '').toUpperCase()}</span>
                         </div>
                         <div class="row g-3 text-center mb-2">
@@ -5069,43 +5377,69 @@
         E('rankSearchInput').oninput = e => { const tm=e.target.value.toLowerCase(); E('tbRanks').querySelectorAll('tr').forEach(r=>{ const t1=r.children[0].textContent.toLowerCase(); r.style.display=t1.includes(tm)?'':'none'; }); };
 
 
-            /* CF sibling of the users-section loader. The Worker's GET /admin/users returns the full
-             * player list (see handleListAllUsers); this maps each camelCase CF row into the exact
-             * Firebase-shaped UC entry R_US() (and the dashboard/analytics UC lookups) already expect,
-             * then reuses R_US() unchanged. Wallet fields come back in PAISE from D1 -> P2R() to rupees,
-             * matching the old Firebase balance/winningCash/bonusCash (which were stored in rupees). */
+            /* CF sibling of the users-section loader. BANDWIDTH FIX (p6 spec): GET /admin/users used
+             * to return the WHOLE player table on every Users-tab visit; it now takes limit/offset
+             * (+ an optional server-side `search` prefix match on username/phone/email) and this
+             * loader pages through it 25 rows at a time instead. UC accumulates whatever pages have
+             * been loaded so far -- the status/sort/joined-date filters below still operate
+             * client-side, but only over the loaded subset (see usersLoadMoreWrap / userFilterCount
+             * for how that's surfaced honestly instead of silently pretending it's the whole table).
+             * Wallet fields come back in PAISE from D1 -> P2R() to rupees, matching the old Firebase
+             * balance/winningCash/bonusCash (which were stored in rupees). */
+            const USERS_PAGE_SIZE = 25;
+            let usersOffset = 0, usersHasMore = false, usersSearchTerm = '';
+
+            const mapUserRowIntoUC = (u) => {
+                UC[u.id] = {
+                    displayName: u.displayName || '',
+                    phone: u.phone, phoneNumber: u.phone,
+                    email: u.email,
+                    referralCode: u.referralCode,
+                    gameName: u.gameName, gameUid: u.gameUid,
+                    balance: P2R(u.deposit),
+                    winningCash: P2R(u.winnings),
+                    bonusCash: P2R(u.bonus),
+                    status: u.isBlocked ? 'banned' : 'active',
+                    isBanned: !!u.isBlocked,
+                    isVip: !!u.isVip,
+                    createdAt: u.createdAt,
+                    lastLogin: u.lastLoginAt,
+                    // Both added to the Worker's user row 2026-07-31: without deviceId the
+                    // View-User device-ban button was permanently stuck on "No device recorded
+                    // yet", and without profilePictureUrl every user showed the generated
+                    // placeholder avatar instead of their real uploaded photo.
+                    deviceId: u.deviceId || '',
+                    profilePictureUrl: u.profilePictureUrl || '',
+                };
+            };
+
+            const fetchUsersPageCF = async (reset) => {
+                if (reset) { usersOffset = 0; UC = {}; }
+                const qs = new URLSearchParams({ limit: USERS_PAGE_SIZE, offset: usersOffset });
+                if (usersSearchTerm) qs.set('search', usersSearchTerm);
+                const d = await CF.get(`admin/users?${qs.toString()}`);
+                (d.users || []).forEach(mapUserRowIntoUC);
+                usersHasMore = !!d.hasMore;
+                usersOffset += (d.users || []).length;
+                // Only present on the first page of an unsearched browse (see handleListAllUsers) --
+                // cheap global COUNT aggregates, not derived from the downloaded rows anymore.
+                if (typeof d.totalUserCount === 'number') { window.usersTotalCount = d.totalUserCount; window.usersActiveCount = d.activeUserCount; }
+                const wrap = E('usersLoadMoreWrap'); if (wrap) wrap.style.display = usersHasMore ? '' : 'none';
+            };
+
             const RX_US_CF = async () => {
                 E('tbUsers').innerHTML = PHO(5);
-                const d = await CF.get('admin/users');
-                UC = {};
-                (d.users || []).forEach(u => {
-                    UC[u.id] = {
-                        displayName: u.displayName || '',
-                        phone: u.phone, phoneNumber: u.phone,
-                        email: u.email,
-                        referralCode: u.referralCode,
-                        gameName: u.gameName, gameUid: u.gameUid,
-                        balance: P2R(u.deposit),
-                        winningCash: P2R(u.winnings),
-                        bonusCash: P2R(u.bonus),
-                        status: u.isBlocked ? 'banned' : 'active',
-                        isBanned: !!u.isBlocked,
-                        isVip: !!u.isVip,
-                        createdAt: u.createdAt,
-                        lastLogin: u.lastLoginAt,
-                        // Both added to the Worker's user row 2026-07-31: without deviceId the
-                        // View-User device-ban button was permanently stuck on "No device recorded
-                        // yet", and without profilePictureUrl every user showed the generated
-                        // placeholder avatar instead of their real uploaded photo.
-                        deviceId: u.deviceId || '',
-                        profilePictureUrl: u.profilePictureUrl || '',
-                    };
-                });
+                usersSearchTerm = (E('userSearchInput')?.value || '').trim();
+                await fetchUsersPageCF(true);
                 await R_US();
             };
 
+            if (E('usersLoadMoreBtn')) E('usersLoadMoreBtn').addEventListener('click', () => A_EX(async () => {
+                await fetchUsersPageCF(false);
+                await R_US();
+            }, E('usersLoadMoreBtn')));
+
             const R_US = async () => {
-            const term = (E('userSearchInput')?.value || '').trim().toLowerCase();
             const statusVal = E('userStatusFilter')?.value || '';
             const sortVal = E('userSortSelect')?.value || 'newest';
             const joinedVal = E('userJoinedFilter')?.value || '';
@@ -5113,24 +5447,34 @@
 
             let entries = Object.entries(UC);
 
-            // Total/Active counts are always computed off the full user set, not the filtered
-            // table below - "active" uses the same 15-day lastLogin/createdAt recency rule as the
-            // "Inactive Users (>15 Days)" widget in User Analytics (RX_UA), so the two stay consistent.
-            if (E('usTotalUsers')) E('usTotalUsers').textContent = Object.keys(UC).length;
+            // Total/Active stat cards: sourced from the server-computed global counts (see
+            // fetchUsersPageCF) when available (CF_LIVE path), falling back to the loaded-set size
+            // for the non-CF/legacy path, which still downloads everything up front.
+            if (E('usTotalUsers')) E('usTotalUsers').textContent = CF_LIVE ? (window.usersTotalCount ?? Object.keys(UC).length) : Object.keys(UC).length;
             if (E('usActiveUsers')) {
-                const activeCutoff = Date.now() - (15 * 86400000);
-                E('usActiveUsers').textContent = Object.values(UC).filter(u => (u.lastLogin || u.createdAt || 0) >= activeCutoff).length;
+                if (CF_LIVE) {
+                    E('usActiveUsers').textContent = window.usersActiveCount ?? 0;
+                } else {
+                    const activeCutoff = Date.now() - (15 * 86400000);
+                    E('usActiveUsers').textContent = Object.values(UC).filter(u => (u.lastLogin || u.createdAt || 0) >= activeCutoff).length;
+                }
             }
 
-            if (term) {
-                entries = entries.filter(([uid, u]) => {
-                    const phoneVal = u.phoneNumber || u.phone || '';
-                    return (u.displayName||'').toLowerCase().includes(term)
-                        || (u.referralCode||'').toLowerCase().includes(term)
-                        || (u.gameUid||'').toLowerCase().includes(term)
-                        || phoneVal.toLowerCase().includes(term)
-                        || uid.toLowerCase().includes(term);
-                });
+            // Search is now server-side (see fetchUsersPageCF's `search` param) on the CF_LIVE path --
+            // UC already only contains matching rows, so no client-side term filter is needed here
+            // anymore. The non-CF/legacy path still filters client-side since it downloads everything.
+            if (!CF_LIVE) {
+                const term = (E('userSearchInput')?.value || '').trim().toLowerCase();
+                if (term) {
+                    entries = entries.filter(([uid, u]) => {
+                        const phoneVal = u.phoneNumber || u.phone || '';
+                        return (u.displayName||'').toLowerCase().includes(term)
+                            || (u.referralCode||'').toLowerCase().includes(term)
+                            || (u.gameUid||'').toLowerCase().includes(term)
+                            || phoneVal.toLowerCase().includes(term)
+                            || uid.toLowerCase().includes(term);
+                    });
+                }
             }
             if (statusVal === 'active') entries = entries.filter(([,u]) => u.status === 'active' && !u.isBanned);
             else if (statusVal === 'banned') entries = entries.filter(([,u]) => u.status !== 'active' || u.isBanned);
@@ -5159,23 +5503,153 @@
             });
             E('tbUsers').innerHTML = h || `<tr><td colspan="6" class="text-center text-muted py-4">No Users Found</td></tr>`;
             if (E('userFilterCount')) {
+                const term = (E('userSearchInput')?.value || '').trim();
                 const filterActive = term || statusVal || joinedVal;
-                E('userFilterCount').innerHTML = filterActive ? `<small class="text-info"><i class="bi bi-funnel-fill"></i> Showing ${entries.length} of ${Object.keys(UC).length} user(s).</small>` : '';
+                if (!filterActive) {
+                    E('userFilterCount').innerHTML = '';
+                } else if (CF_LIVE) {
+                    // Status/sort/joined-date filters only apply to whatever pages have been loaded
+                    // so far -- said honestly here instead of implying it's the whole table (see
+                    // fetchUsersPageCF; Load More / a narrower search reaches the rest).
+                    E('userFilterCount').innerHTML = `<small class="text-info"><i class="bi bi-funnel-fill"></i> Showing ${entries.length} of ${Object.keys(UC).length} loaded user(s)${usersHasMore ? ' (more available -- Load More or refine your search)' : ''}.</small>`;
+                } else {
+                    E('userFilterCount').innerHTML = `<small class="text-info"><i class="bi bi-funnel-fill"></i> Showing ${entries.length} of ${Object.keys(UC).length} user(s).</small>`;
+                }
             }
         };
 
         let userSearchDebounce;
-        if (E('userSearchInput')) E('userSearchInput').addEventListener('input', () => { clearTimeout(userSearchDebounce); userSearchDebounce = setTimeout(() => R_US(), 250); });
+        if (E('userSearchInput')) E('userSearchInput').addEventListener('input', () => {
+            clearTimeout(userSearchDebounce);
+            userSearchDebounce = setTimeout(() => {
+                // CF_LIVE: the search term is a server-side query (see fetchUsersPageCF), so a new
+                // term means a fresh paginated fetch, not just a client-side re-render.
+                if (CF_LIVE) A_EX(RX_US_CF); else R_US();
+            }, 300);
+        });
         if (E('userStatusFilter')) E('userStatusFilter').addEventListener('change', () => R_US());
         if (E('userSortSelect')) E('userSortSelect').addEventListener('change', () => R_US());
         if (E('userJoinedFilter')) E('userJoinedFilter').addEventListener('change', () => R_US());
         if (E('userFilterClear')) E('userFilterClear').addEventListener('click', () => {
+            const hadSearch = (E('userSearchInput')?.value || '').trim().length > 0;
             if (E('userSearchInput')) E('userSearchInput').value = '';
             if (E('userStatusFilter')) E('userStatusFilter').value = '';
             if (E('userSortSelect')) E('userSortSelect').value = 'newest';
             if (E('userJoinedFilter')) E('userJoinedFilter').value = '';
-            R_US();
+            if (CF_LIVE && hadSearch) A_EX(RX_US_CF); else R_US();
         });
+
+        /* Universal search (p6 spec) -- GET /admin/search, a staged exact-match-first lookup across
+         * users/matches/transactions/deposits/withdrawals/host-withdrawals, permission-scoped
+         * server-side per category (a category simply won't appear in the response if the caller
+         * lacks the matching permission -- see handlers/search.ts). Only wired for CF_LIVE; the panel
+         * has no Firebase-backed equivalent search across this many node types to fall back to. */
+        let globalSearchDebounce = null;
+        let globalSearchToken = 0;
+        // Holds the full match object for every match currently shown in the search dropdown,
+        // keyed by id -- 'goto-match-result' (below) needs the whole row (name/matchUniqueId/
+        // status), not just the id, to drop the match straight into Match Results' target-match
+        // select without a second network round trip.
+        const GLOBAL_SEARCH_MATCH_CACHE = {};
+
+        const GLOBAL_SEARCH_MIN_LEN = 2;
+
+        const renderGlobalSearchEmpty = (msg) => {
+            E('globalSearchResults').innerHTML = `<div class="text-center text-muted py-3 small">${msg}</div>`;
+        };
+
+        const globalSearchResultSection = (title, itemsHtml) =>
+            `<div class="mb-2"><div class="text-uppercase text-muted fw-bold px-2" style="font-size:0.65rem; letter-spacing:1px;">${title}</div>${itemsHtml}</div>`;
+
+        const renderGlobalSearchResults = (data) => {
+            const sections = [];
+
+            if (data.users && data.users.length) {
+                sections.push(globalSearchResultSection('Users', data.users.map(u => {
+                    mapUserRowIntoUC(u);
+                    const wallet = P2R(u.deposit || 0) + P2R(u.winnings || 0) + P2R(u.bonus || 0);
+                    return `<button type="button" class="btn btn-sm w-100 text-start d-flex justify-content-between align-items-center mb-1" style="background:rgba(255,255,255,0.03);" data-action="in-us" data-id="${u.id}">
+                        <span>${FORMAT_USER(u.id, u.email)}<br><small class="text-muted font-monospace">${u.phone || ''}</small></span>
+                        <span class="text-success fw-bold font-monospace">${FMT_C(wallet.toFixed(2))}</span>
+                    </button>`;
+                }).join('')));
+            }
+            if (data.matches && data.matches.length) {
+                // A searched match could be wanted for either reason -- checking/entering its
+                // result, or editing its setup (room ID, prize pool, etc.) -- so offer both instead
+                // of guessing. GLOBAL_SEARCH_MATCH_CACHE lets 'goto-match-result' below drop this
+                // exact row straight into Match Results' target-match select without refetching it.
+                sections.push(globalSearchResultSection('Matches', data.matches.map(t => {
+                    GLOBAL_SEARCH_MATCH_CACHE[t.id] = t;
+                    return `<div class="d-flex justify-content-between align-items-center mb-1 px-2 py-1" style="background:rgba(255,255,255,0.03); border-radius:6px;">
+                        <div class="small">
+                            <strong>${t.name || 'Match'}</strong> <span class="badge bg-dark border border-secondary text-warning">${t.matchUniqueId || ''}</span><br>
+                            <small class="text-muted">Room: ${t.roomId || '--'} &middot; Status: ${(t.status || '').toUpperCase()}</small>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" data-action="goto-match-result" data-id="${t.id}" title="View / Enter Result"><i class="bi bi-flag-fill"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" data-action="e-tr-cf" data-id="${t.id}" title="Edit Match Setup"><i class="bi bi-gear-fill"></i></button>
+                        </div>
+                    </div>`;
+                }).join('')));
+            }
+            // Transactions/deposits/withdrawals/host-withdrawals: informational (the approve/reject
+            // actions depend on the section's own tab state -- e.g. CUR_WD_STATUS/CUR_WD_TYPE -- so
+            // rather than duplicate that logic here, jump to the right section to act on it.
+            const infoRow = (label, amount, status, sectionId) => `<div class="d-flex justify-content-between align-items-center px-2 py-1 mb-1" style="background:rgba(255,255,255,0.03); border-radius:6px;">
+                <span class="small">${label}<br><small class="text-muted">${status || ''}</small></span>
+                <span class="d-flex align-items-center gap-2"><span class="fw-bold font-monospace">${amount}</span><button type="button" class="btn btn-sm btn-outline-info py-0 px-2" data-action="goto-search-section" data-section="${sectionId}"><i class="bi bi-box-arrow-up-right"></i></button></span>
+            </div>`;
+            if (data.transactions && data.transactions.length) {
+                sections.push(globalSearchResultSection('Transactions', data.transactions.map(x => infoRow(`${x.transactionType || 'Transaction'} &middot; ${FORMAT_USER(x.userId)}`, FMT_C(P2R(x.amount)), x.isCredit ? 'Credit' : 'Debit', 'transaction-history-section')).join('')));
+            }
+            if (data.deposits && data.deposits.length) {
+                sections.push(globalSearchResultSection('Deposits', data.deposits.map(d => infoRow(FORMAT_USER(d.userId), FMT_C(P2R(d.amount)), (d.status || '').toUpperCase(), 'deposit-section')).join('')));
+            }
+            if (data.withdrawals && data.withdrawals.length) {
+                sections.push(globalSearchResultSection('Withdrawals', data.withdrawals.map(w => infoRow(FORMAT_USER(w.userId), FMT_C(P2R(w.amount)), (w.status || '').toUpperCase(), 'withdrawals-section')).join('')));
+            }
+            if (data.hostWithdrawals && data.hostWithdrawals.length) {
+                sections.push(globalSearchResultSection('Host Payouts', data.hostWithdrawals.map(w => infoRow(`Host: ${w.hostId}`, FMT_C(P2R(w.amount)), (w.status || '').toUpperCase(), 'withdrawals-section')).join('')));
+            }
+
+            E('globalSearchResults').innerHTML = sections.length ? sections.join('') : `<div class="text-center text-muted py-3 small">No matches found.</div>`;
+        };
+
+        const runGlobalSearch = async () => {
+            const term = (E('globalSearchInput')?.value || '').trim();
+            if (term.length < GLOBAL_SEARCH_MIN_LEN) { E('globalSearchResults').style.display = 'none'; return; }
+            const myToken = ++globalSearchToken;
+            E('globalSearchResults').style.display = 'block';
+            renderGlobalSearchEmpty('<div class="spinner-border spinner-border-sm"></div>');
+            try {
+                const data = await CF.get(`admin/search?q=${encodeURIComponent(term)}`);
+                if (myToken !== globalSearchToken) return; // a newer search superseded this one
+                renderGlobalSearchResults(data);
+            } catch (e) {
+                if (myToken !== globalSearchToken) return;
+                renderGlobalSearchEmpty('Search failed.');
+            }
+        };
+
+        if (E('globalSearchInput')) {
+            E('globalSearchInput').addEventListener('input', () => {
+                clearTimeout(globalSearchDebounce);
+                globalSearchDebounce = setTimeout(runGlobalSearch, 350);
+            });
+            E('globalSearchInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { clearTimeout(globalSearchDebounce); runGlobalSearch(); }
+                if (e.key === 'Escape') { E('globalSearchInput').blur(); E('globalSearchResults').style.display = 'none'; }
+            });
+            E('globalSearchInput').addEventListener('focus', () => {
+                if (E('globalSearchInput').value.trim().length >= GLOBAL_SEARCH_MIN_LEN) E('globalSearchResults').style.display = 'block';
+            });
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#globalSearchInput') && !e.target.closest('#globalSearchResults')) {
+                    E('globalSearchResults').style.display = 'none';
+                }
+            });
+        }
 
         E('fmUsCr').onsubmit = e => { e.preventDefault(); A_EX(async () => {
             if(!CHK_P('user_mgt')) return TS('Unauthorized','error');
@@ -5407,14 +5881,20 @@
          * all). UI status vocabulary (pending/completed/rejected) maps onto the Worker's own
          * (pending/approved/rejected). w.upi replaces the Firebase methodDetails.accountInfo/method
          * pair -- the Worker only ever supports one payout method (UPI). */
-        const RX_WD_CF = async () => {
+        let WD_LIMIT = 30;
+        /* BANDWIDTH FIX (p6 spec): every withdrawals sub-tab (money/redeem/host) used to fetch every
+         * row for the status, no LIMIT. Same growing-limit-refetch idiom as RX_DP_CF/legacy RX_TX --
+         * see RX_DP_CF's comment for why this shape over true offset paging. */
+        const RX_WD_CF = async (loadMore = false) => {
+            WD_LIMIT = loadMore ? WD_LIMIT + 30 : 30;
             const s = CUR_WD_STATUS;
             const cfStatus = s === 'completed' ? 'approved' : s;
             try {
                 if(CUR_WD_TYPE === 'money') {
                     const tH={'pending':'<tr><th>Req Date</th><th>User Account</th><th>Amount</th><th>Method Details</th><th>Action</th></tr>','completed':'<tr><th>Process Date</th><th>User Account</th><th>Amount</th><th>Method Details</th><th>Ref ID / Receipt</th></tr>','rejected':'<tr><th>Process Date</th><th>User Account</th><th>Amount</th><th>Rejection Reason</th></tr>'};
-                    E('wdTh').innerHTML=tH[s]; E('tbWd').innerHTML=PHO({pending:5,completed:5,rejected:4}[s]);
-                    const data = await CF.get(`withdrawals?status=${cfStatus}`); let h='';
+                    const colspan = {pending:5,completed:5,rejected:4}[s];
+                    E('wdTh').innerHTML=tH[s]; if (!loadMore) E('tbWd').innerHTML=PHO(colspan);
+                    const data = await CF.get(`withdrawals?status=${cfStatus}&limit=${WD_LIMIT}`); let h='';
                     (data.withdrawals || []).slice().sort((x,y)=>(Number(y.createdAt)||0)-(Number(x.createdAt)||0)).forEach(w=>{
                         h+=`<tr><td><small class="font-monospace">${DT(w.createdAt||w.processedAt)}</small></td>
                         <td>${FORMAT_USER(w.userId)}</td>
@@ -5425,12 +5905,14 @@
                         else h+=`<td><small class="text-danger text-truncate d-inline-block" style="max-width:150px;">${w.rejectReason||'--'}</small></td>`;
                         h+='</tr>';
                     });
-                    E('tbWd').innerHTML = h || `<tr><td colspan="${{pending:5,completed:5,rejected:4}[s]}" class="text-center text-muted py-4">No Withdrawals Here</td></tr>`;
+                    if (data.hasMore) h += `<tr><td colspan="${colspan}" class="text-center"><button class="btn btn-sm btn-outline-secondary" data-action="load-more-wd">Load more</button></td></tr>`;
+                    E('tbWd').innerHTML = h || `<tr><td colspan="${colspan}" class="text-center text-muted py-4">No Withdrawals Here</td></tr>`;
                 } else if(CUR_WD_TYPE === 'redeem') {
                     // CUTOVER 2026-07-26: redeem cash-out is on the Worker now (withdrawals with method='redeem').
                     const tH={'pending':'<tr><th>Req Date</th><th>User Account</th><th>Amount</th><th>Payout</th><th>Action</th></tr>','completed':'<tr><th>Process Date</th><th>User Account</th><th>Amount</th><th>Payout</th><th>Redeem Code Sent</th></tr>','rejected':'<tr><th>Process Date</th><th>User Account</th><th>Amount</th><th>Rejection Reason</th></tr>'};
-                    E('wdTh').innerHTML=tH[s]; E('tbWd').innerHTML=PHO({pending:5,completed:5,rejected:4}[s]);
-                    const data = await CF.get(`withdrawals?status=${cfStatus}&method=redeem`); let h='';
+                    const colspan = {pending:5,completed:5,rejected:4}[s];
+                    E('wdTh').innerHTML=tH[s]; if (!loadMore) E('tbWd').innerHTML=PHO(colspan);
+                    const data = await CF.get(`withdrawals?status=${cfStatus}&method=redeem&limit=${WD_LIMIT}`); let h='';
                     (data.withdrawals || []).slice().sort((x,y)=>(Number(y.createdAt)||0)-(Number(x.createdAt)||0)).forEach(w=>{
                         const em = (UC[w.userId] && UC[w.userId].email) || w.userId; const amtR = P2R(w.amount);
                         h+=`<tr><td><small class="font-monospace">${DT(w.createdAt||w.processedAt)}</small></td>
@@ -5441,11 +5923,13 @@
                         else h+=`<td><small class="text-danger text-truncate d-inline-block" style="max-width:150px;">${w.rejectReason||'--'}</small></td>`;
                         h+='</tr>';
                     });
-                    E('tbWd').innerHTML = h || `<tr><td colspan="${{pending:5,completed:5,rejected:4}[s]}" class="text-center text-muted py-4">No Redeem Withdrawals Here</td></tr>`;
+                    if (data.hasMore) h += `<tr><td colspan="${colspan}" class="text-center"><button class="btn btn-sm btn-outline-secondary" data-action="load-more-wd">Load more</button></td></tr>`;
+                    E('tbWd').innerHTML = h || `<tr><td colspan="${colspan}" class="text-center text-muted py-4">No Redeem Withdrawals Here</td></tr>`;
                 } else if(CUR_WD_TYPE === 'host') {
                     const tH={'pending':'<tr><th>Req Date</th><th>Host Account</th><th>Amount</th><th>Payout Method</th><th>Action</th></tr>','completed':'<tr><th>Process Date</th><th>Host Account</th><th>Amount</th><th>Payout Method</th><th>Ref ID</th></tr>','rejected':'<tr><th>Process Date</th><th>Host Account</th><th>Amount</th><th>Rejection Reason</th></tr>'};
-                    E('wdTh').innerHTML=tH[s]; E('tbWd').innerHTML=PHO({pending:5,completed:5,rejected:4}[s]);
-                    const data = await CF.get(`host-withdrawals?status=${cfStatus}`); let h='';
+                    const colspan = {pending:5,completed:5,rejected:4}[s];
+                    E('wdTh').innerHTML=tH[s]; if (!loadMore) E('tbWd').innerHTML=PHO(colspan);
+                    const data = await CF.get(`host-withdrawals?status=${cfStatus}&limit=${WD_LIMIT}`); let h='';
                     (data.hostWithdrawals || []).slice().sort((x,y)=>(Number(y.createdAt)||0)-(Number(x.createdAt)||0)).forEach(w=>{
                         h+=`<tr><td><small class="font-monospace">${DT(w.createdAt||w.processedAt)}</small></td>
                         <td><small class="text-muted font-monospace">${w.hostId}</small></td>
@@ -5455,7 +5939,8 @@
                         else h+=`<td><small class="text-danger text-truncate d-inline-block" style="max-width:150px;">${w.rejectReason||'--'}</small></td>`;
                         h+='</tr>';
                     });
-                    E('tbWd').innerHTML = h || `<tr><td colspan="${{pending:5,completed:5,rejected:4}[s]}" class="text-center text-muted py-4">No Host Payouts Here</td></tr>`;
+                    if (data.hasMore) h += `<tr><td colspan="${colspan}" class="text-center"><button class="btn btn-sm btn-outline-secondary" data-action="load-more-wd">Load more</button></td></tr>`;
+                    E('tbWd').innerHTML = h || `<tr><td colspan="${colspan}" class="text-center text-muted py-4">No Host Payouts Here</td></tr>`;
                 }
             } catch(e) { E('tbWd').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error loading data</td></tr>`; }
         };
@@ -5675,7 +6160,7 @@
             A_EX(async () => {
                 if (!CHK_P('sup_mgt')) return TS('Unauthorized','error');
                 if (!SC_OPEN_ID || !SC_OPEN_UID) return;
-                if (!confirm('Delete this conversation? This removes it and all its messages permanently.')) return;
+                if (!await UI_CONFIRM('Delete this conversation? This removes it and all its messages permanently.')) return;
                 if (CF_LIVE) await deleteTicketCF(SC_OPEN_ID);
                 else await remove(ref(rd, `supportChats/${SC_OPEN_UID}/${SC_OPEN_ID}`));
                 TS('Conversation deleted', 'success');
@@ -5721,12 +6206,21 @@
          * match-winnings/coupon credits live in ledger_entries instead) -- a genuine simplification,
          * confirmed via the schema design, not a gap. UI status vocabulary (pending/success/failed)
          * maps onto the Worker's own (pending/approved/rejected). */
-        const RX_DP_CF = async s => {
+        let DP_LIMIT = 30;
+        /* BANDWIDTH FIX (p6 spec): this used to fetch every deposit in the status, no LIMIT --
+         * "pending" self-limits in practice (it's an active queue), but "success"/"failed" are full
+         * history and grow without bound. Same growing-limit-refetch idiom the legacy RX_TX already
+         * used (see TX_LIMIT) rather than true offset paging, for consistency with the one other
+         * Load More already in this file and because these fetches are cheap/fast enough that
+         * re-reading the first N rows on each Load More isn't worth the extra bookkeeping. */
+        const RX_DP_CF = async (s, loadMore = false) => {
+            DP_LIMIT = loadMore ? DP_LIMIT + 30 : 30;
             const tH={'pending':'<tr><th>Date & Time</th><th>User Account</th><th>Amount</th><th>UTR / Receipt</th><th>Payment Method</th><th>Action</th></tr>','success':'<tr><th>Date & Time</th><th>User Account</th><th>Amount</th><th>UTR / Receipt</th><th>Payment Method</th></tr>','failed':'<tr><th>Date & Time</th><th>User Account</th><th>Amount</th><th>UTR / Receipt</th><th>Payment Method</th></tr>'};
-            E('dpTh').innerHTML=tH[s]; E('tbDp').innerHTML=PHO({pending:6,success:5,failed:5}[s]);
+            E('dpTh').innerHTML=tH[s]; if (!loadMore) E('tbDp').innerHTML=PHO({pending:6,success:5,failed:5}[s]);
             const cfStatus = s === 'success' ? 'approved' : s === 'failed' ? 'rejected' : 'pending';
+            const colspan = s==='pending'?6:5;
             try {
-                const data = await CF.get(`deposits?status=${cfStatus}`); let h='';
+                const data = await CF.get(`deposits?status=${cfStatus}&limit=${DP_LIMIT}`); let h='';
                 (data.deposits || []).slice().sort((x,y)=>(Number(y.createdAt)||0)-(Number(x.createdAt)||0)).forEach(d=>{
                     const isImg = d.utr && (d.utr.includes('http') || d.utr.includes('imgbb'));
                     const utrDisplay = isImg ? `<a href="${d.utr}" target="_blank" class="text-info text-decoration-underline"><i class="bi bi-image"></i> View Receipt</a>` : `<small class="text-warning fw-bold font-monospace bg-dark px-1 rounded border border-secondary text-truncate d-inline-block" style="max-width:120px;">${d.utr||'-'}</small>`;
@@ -5736,8 +6230,9 @@
                     if(s==='pending') h+=`<td><span class="badge-premium badge-info">${d.method||'-'}</span></td><td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-success fw-bold py-1" data-action="ap-d-cf" data-id="${d.id}"><i class="bi bi-check-lg"></i> Approve</button><button class="btn btn-sm btn-outline-danger fw-bold py-1" data-action="rj-d-cf" data-id="${d.id}"><i class="bi bi-x-lg"></i> Reject</button></div></td>`;
                     else h+=`<td><span class="badge bg-dark text-muted border border-secondary">${d.method||'-'}</span></td>`; h+='</tr>';
                 });
-                E('tbDp').innerHTML = h || `<tr><td colspan="${s==='pending'?6:5}" class="text-center text-muted py-4">No Deposits Here</td></tr>`;
-            } catch(e) { E('tbDp').innerHTML = `<tr><td colspan="${s==='pending'?6:5}" class="text-center text-danger py-4">Error loading data</td></tr>`; }
+                if (data.hasMore) h += `<tr><td colspan="${colspan}" class="text-center"><button class="btn btn-sm btn-outline-secondary" data-action="load-more-dp" data-status="${s}">Load more</button></td></tr>`;
+                E('tbDp').innerHTML = h || `<tr><td colspan="${colspan}" class="text-center text-muted py-4">No Deposits Here</td></tr>`;
+            } catch(e) { E('tbDp').innerHTML = `<tr><td colspan="${colspan}" class="text-center text-danger py-4">Error loading data</td></tr>`; }
         };
 
         /* Stuck ZapUPI payments (2026-07-31). A ZapUPI order is only ever completed by the paying
@@ -5916,6 +6411,39 @@
          * ledger rows with their own transaction_type. */
         const userMatchesCF = (uid) => CF.get(`admin/users/${uid}/matches`);
         const userLedgerCF = (uid) => CF.get(`admin/users/${uid}/ledger?limit=200`);
+
+        /* Transaction Ledger filter (usrTxnFilter) -- the tab used to always show every ledger row
+         * mixed together (deposits, withdrawals, match winnings, entry fees, adjustments...), with
+         * no way to isolate just the money movements you actually came to check. The already-fetched
+         * ledger is kept here so switching the filter re-renders instantly with no extra fetch. */
+        let CUR_USER_LEDGER = [];
+        const LEDGER_LABEL = {
+            match_winning: ['Match Winning','success'], refund: ['Refund','success'],
+            match_entry_fee: ['Entry Fee','danger'], match_entry: ['Result Adjustment','danger'],
+            match_deduction: ['Result Adjustment','danger'], deduction: ['Wallet Adjustment (Debit)','danger'],
+            coupon_claim: ['Coupon Code','info'], redeem_code: ['Redeem Code Claim','info'],
+            promo_signup: ['Signup Bonus','info'], referral_bonus: ['Referral Bonus','info'],
+            withdrawal: ['Withdrawal','danger'],
+        };
+        const TIER_LABEL = { deposit: 'Deposit', winnings: 'Winning', bonus: 'Bonus' };
+        const renderUserLedgerRows = () => {
+            const filterVal = E('usrTxnFilter')?.value || '';
+            const rows = filterVal ? CUR_USER_LEDGER.filter(r => r.transactionType === filterVal) : CUR_USER_LEDGER;
+            let tH = '';
+            rows.forEach(r => {
+                let label, color;
+                if (r.transactionType === 'deposit') {
+                    [label, color] = String(r.note||'').startsWith('OVD_OP:') ? ['Wallet Adjustment (Credit)','success'] : ['Deposit','success'];
+                } else {
+                    [label, color] = LEDGER_LABEL[r.transactionType] || [r.transactionType || 'Transaction', r.isCredit ? 'success' : 'danger'];
+                }
+                const tierNote = TIER_LABEL[r.tier] ? `${TIER_LABEL[r.tier]} wallet` : '';
+                const note = [r.note, tierNote].filter(Boolean).join(' · ');
+                tH += `<tr><td><small class="font-monospace">${DT(r.createdAt)}</small></td><td><span class="badge-premium badge-${color}">${ESC(label)}</span>${note?`<br><small class="text-muted">${ESC(note)}</small>`:''}</td><td class="fw-bold font-monospace ${r.isCredit?'text-success':'text-danger'}">${r.isCredit?'+':'-'}${FMT_C(P2R(r.amount).toFixed(2))}</td><td><span class="badge bg-dark border border-secondary text-success">COMPLETED</span></td></tr>`;
+            });
+            E('tbUsrTxn').innerHTML = tH || `<tr><td colspan="4" class="text-center text-muted py-4">No ${filterVal ? (filterVal === 'deposit' ? 'Deposits' : 'Withdrawals') : 'Transactions'} Found</td></tr>`;
+        };
+        if (E('usrTxnFilter')) E('usrTxnFilter').addEventListener('change', renderUserLedgerRows);
 
         /* CUTOVER 2026-07-24 (Group B -- Worker endpoints built + deployed this pass).
          * blockUserCF -> POST /users/:id/block (handleSetBlockedStatus, enforced on every
@@ -6322,11 +6850,18 @@
          * from every earlier wave's own list), not something this port silently drops. Host-vs-match
          * linkage for the "View Matches" modal reuses RX_TR_CF's own `GET /admin/matches` fetch and
          * filters client-side by hostId, same shape as the original's own `matches.filter(...)`. */
+        /* BANDWIDTH FIX 2026-08-02: this used to also fetch the ENTIRE unfiltered `admin/matches`
+         * table on every Host Management visit, purely to slice out each host's match list for the
+         * "View Matches" button (confirmed via `wrangler d1 insights` as one of the biggest D1 read
+         * consumers app-wide). host.matchesHosted is already a real, always-maintained server
+         * counter (see hosts.matches_hosted, incremented at match-finalize time) -- no client-side
+         * fallback count needed. "View Matches" now fetches that one host's matches on demand
+         * (openHostMatchesCF, `admin/matches?hostId=...`) instead of downloading every match for
+         * every host up front. */
         const RX_HO_CF = async () => {
             try {
-                const [data, matchData] = await Promise.all([CF.get('admin/hosts'), CF.get('admin/matches')]);
+                const data = await CF.get('admin/hosts');
                 const hosts = data.hosts || [];
-                const matches = matchData.matches || [];
 
                 let pendingCount = 0, pendingAmt = 0; // always 0 -- see comment above.
                 E('hoStatTotal').textContent = hosts.length;
@@ -6336,13 +6871,12 @@
 
                 let h = '';
                 hosts.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).forEach(host => {
-                    const hostMatches = matches.filter(m => m.hostId === host.userId);
-                    const matchCount = host.matchesHosted || hostMatches.filter(m=>m.status==='completed').length;
+                    const matchCount = host.matchesHosted || 0;
                     const statusBadge = host.status === 'active' ? 'badge-success' : (host.status === 'banned' ? 'badge-danger' : 'badge-warning');
                     let actionBtns = `<button class="btn btn-sm btn-outline-primary py-1" data-action="e-st" data-id="${host.userId}" title="Edit Host"><i class="bi bi-pencil"></i></button>`;
                     actionBtns += `<button class="btn btn-sm btn-outline-success py-1" data-action="adj-host-wallet" data-id="${host.userId}" data-name="${ESC(host.name)}" data-bal="${host.walletBalance||0}" title="Adjust Wallet"><i class="bi bi-wallet2"></i></button>`;
                     const hostNameJs = (host.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
-                    actionBtns += `<button class="btn btn-sm btn-outline-info py-1" onclick='openHostMatches(${JSON.stringify(hostMatches).replace(/'/g, "&apos;")}, "${hostNameJs}")' title="View Matches"><i class="bi bi-eye-fill"></i></button>`;
+                    actionBtns += `<button class="btn btn-sm btn-outline-info py-1" onclick='openHostMatchesCF("${host.userId}", "${hostNameJs}")' title="View Matches"><i class="bi bi-eye-fill"></i></button>`;
                     actionBtns += `<button class="btn btn-sm btn-outline-warning py-1" data-action="notify-host" data-id="${host.userId}" data-name="${ESC(host.name)}" title="Send Notification"><i class="bi bi-bell-fill"></i></button>`;
                     actionBtns += host.status === 'active' ? `<button class="btn btn-sm btn-outline-warning py-1" data-action="susp-st" data-id="${host.userId}" title="Suspend"><i class="bi bi-pause-circle"></i></button>` : `<button class="btn btn-sm btn-outline-success py-1" data-action="act-st" data-id="${host.userId}" title="Activate"><i class="bi bi-play-circle"></i></button>`;
                     if(host.status !== 'banned') actionBtns += `<button class="btn btn-sm btn-outline-danger py-1" data-action="ban-st" data-id="${host.userId}" title="Ban Host"><i class="bi bi-shield-x"></i></button>`;
@@ -6385,10 +6919,22 @@
             } catch(e) { E('tbHostRewards').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error loading reward log</td></tr>`; }
         };
 
+        /* On-demand counterpart to openHostMatches (below) for the CF-live path -- fetches just
+         * this one host's matches (`admin/matches?hostId=...`) instead of relying on a pre-sliced
+         * array built from a full-table download (see RX_HO_CF's own comment). */
+        window.openHostMatchesCF = async (hostId, hostName) => {
+            LD(true);
+            try {
+                const data = await CF.get(`admin/matches?hostId=${encodeURIComponent(hostId)}`);
+                window.openHostMatches(data.matches || [], hostName);
+            } catch(e) { TS('Could not load this host\'s matches.', 'error'); }
+            finally { LD(false); }
+        };
+
         window.openHostMatches = (matches, hostName) => {
             E('hmHostName').textContent = hostName;
             let h = '';
-            matches.sort((a,b) => b.startTime - a.startTime).forEach(m => {
+            matches.slice().sort((a,b) => b.startTime - a.startTime).forEach(m => {
                 const statusColor = m.status==='upcoming'?'info':(m.status==='ongoing'?'warning':(m.status==='completed'?'success':'secondary'));
                 h += `<tr>
                     <td><strong class="text-white">${m.name}</strong> <span class="badge bg-dark border border-secondary text-warning">${m.matchUniqueId||''}</span></td>
@@ -6525,11 +7071,49 @@
         document.body.addEventListener('click', e => {
             const b = e.target.closest('[data-action]'); if(!b) return;
             const a = b.dataset.action, id = b.dataset.id;
+            // Close the universal search dropdown whenever a result inside it is acted on (View
+            // User, Edit Match, etc.) -- 'goto-search-section' already closes it itself above.
+            if (b.closest('#globalSearchResults') && a !== 'goto-search-section' && E('globalSearchResults')) {
+                E('globalSearchResults').style.display = 'none';
+            }
             A_EX(async () => {
                 if(a==='set-theme') { const t = b.dataset.themeVal; document.documentElement.setAttribute('data-theme', t); localStorage.setItem('admin_theme', t); document.querySelectorAll('[data-action="set-theme"]').forEach(btn => btn.classList.remove('active-theme')); b.classList.add('active-theme'); TS('Theme applied successfully', 'success'); }
                 if(a==='load-more-ml') { await RX_ML(true); }
                 if(a==='load-more-sl') { await RX_SL(true); }
                 if(a==='load-more-tx') { await RX_TX(true); }
+                if(a==='load-more-dp') { await RX_DP_CF(b.dataset.status, true); }
+                if(a==='load-more-wd') { await RX_WD_CF(true); }
+                if(a==='goto-search-section') {
+                    E('globalSearchResults').style.display = 'none';
+                    if (E('globalSearchInput')) E('globalSearchInput').value = '';
+                    R_N(b.dataset.section);
+                }
+                if(a==='goto-match-result') {
+                    if(!CHK_P('match_edit') && !CHK_P('live_mgt') && window.C_ROLE !== 'Host') return TS('Unauthorized','error');
+                    const t = GLOBAL_SEARCH_MATCH_CACHE[id];
+                    E('globalSearchResults').style.display = 'none';
+                    if (E('globalSearchInput')) E('globalSearchInput').value = '';
+                    R_N('tournament-management-section');
+                    // BUG FIX 2026-08-02: this used to leave tmMatchSearchInput empty, so R_N's own
+                    // section-open fetch loaded the NORMAL awaiting+completed list into "Matches
+                    // Matching Filter" -- the admin got here to look at one specific match and instead
+                    // saw the whole list with their match tacked on below it. Pre-filling the search
+                    // box before the fetch runs its search branch (see RX_TM_CF) narrows that list
+                    // down to just this one match too, same as using the search box directly.
+                    if (t && E('tmMatchSearchInput')) E('tmMatchSearchInput').value = (t.matchUniqueId || t.id).replace(/^#/, '');
+                    if (CF_LIVE) await RX_TM_CF();
+                    const select = E('computationTargetSelect');
+                    if (select && t) {
+                        // The searched match may be outside the current Time Window/status scope
+                        // (same reasoning as btnSearchMatchById above) -- add it if the fresh fetch
+                        // didn't already include it.
+                        if (!Array.from(select.options).some(o => o.value === t.id)) {
+                            select.add(new Option(`${t.matchUniqueId ? t.matchUniqueId+' - ' : ''}${t.name||'Match'} [${(t.status||'').toUpperCase()}]`, t.id));
+                        }
+                        select.value = t.id;
+                        select.dispatchEvent(new Event('change'));
+                    }
+                }
                 if(a==='add-an') { if(!CHK_P('promo_mgt')) return TS('Unauthorized','error'); E('fmAnnouncement').reset(); E('anId').value=''; E('anCustomSpeedDiv').style.display='none'; ML['announcementModal'].show(); }
                 if(a==='add-rdm-s') { if(!CHK_P('rdm_mgt')) return TS('Unauthorized','error'); UI.openModal('redeemModal', {mode:'single'}); }
                 if(a==='add-rdm-b') { if(!CHK_P('rdm_mgt')) return TS('Unauthorized','error'); UI.openModal('redeemModal', {mode:'bulk'}); }
@@ -6540,8 +7124,8 @@
                 if(a==='add-mode') { if(!CHK_P('mode_mgt')) return TS('Unauthorized','error'); E('fmMode').reset(); E('mdId').value=''; if(!Object.keys(GC).length) { if(CF_LIVE) await RX_GA_CF().catch(()=>{}); else await RX_GA().catch(()=>{}); } E('mdGameId').innerHTML = '<option value="">Select Game</option>' + Object.entries(GC).map(([gid,g])=>`<option value="${gid}">${g.name}</option>`).join(''); ML['modeModal'].show(); }
                 if(a==='add-promo') { if(!CHK_P('promo_mgt')) return TS('Unauthorized','error'); E('fmPromo').reset(); E('prId').value=''; ML['promoModal'].show(); }
                 if(a==='add-user') { if(!CHK_P('user_mgt')) return TS('Unauthorized','error'); E('fmUsCr').reset(); ML['userCreateModal'].show(); }
-                if(a==='add-staff') { if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); E('fmStf').reset(); E('stId').value=''; E('stHd').textContent="Add Staff"; E('stE').readOnly=false; E('stPx').style.display='block'; E('stP').required=true; if(E('stPLabel')) E('stPLabel').textContent='Password'; if(E('stMobileWrap')) E('stMobileWrap').style.display='none'; document.querySelectorAll('.perm-cb').forEach(c=>c.checked=false); ML['staffOpModal'].show(); }
-                if(a==='add-host') { if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); E('fmStf').reset(); E('stId').value=''; E('stHd').textContent="Add Host"; E('stE').readOnly=false; E('stPx').style.display='block'; E('stP').required=true; if(E('stPLabel')) E('stPLabel').textContent='Password'; E('stRole').value='Host'; E('stRole').dispatchEvent(new Event('change')); ML['staffOpModal'].show(); }
+                if(a==='add-staff') { if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); E('fmStf').reset(); E('stId').value=''; E('stHd').textContent="Add Staff"; E('stE').readOnly=false; E('stE').required=true; E('stPx').style.display='block'; E('stP').required=true; if(E('stPLabel')) E('stPLabel').textContent='Password'; if(E('stMobileWrap')) E('stMobileWrap').style.display='none'; document.querySelectorAll('.perm-cb').forEach(c=>c.checked=false); ML['staffOpModal'].show(); }
+                if(a==='add-host') { if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); E('fmStf').reset(); E('stId').value=''; E('stHd').textContent="Add Host"; E('stE').readOnly=false; E('stE').required=true; E('stPx').style.display='block'; E('stP').required=true; if(E('stPLabel')) E('stPLabel').textContent='Password'; E('stRole').value='Host'; E('stRole').dispatchEvent(new Event('change')); ML['staffOpModal'].show(); }
 
                 if(a==='add-match') {
                     if(!CHK_P('match_add')) return TS('Unauthorized','error');
@@ -6665,12 +7249,12 @@
                  * writes. hostWallet cleanup is gone -- there's no equivalent pre-created row to
                  * clean up (ensureHost creates the Worker's hosts row lazily). Reload via RX_ST_CF/
                  * RX_HO_CF now that both lists are Cloudflare-sourced. */
-                if(a==='d-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(confirm("Are you sure you want to permanently delete this Staff Member?")) { if(CF_LIVE) { await deleteStaffCF(id); LOG_ACT('staff','Deleted Staff', `UID: ${id}`); CLR_CACHE(['staff','hostWallet']); TS('Staff Deleted'); await RX_ST_CF(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO_CF(); } else { const delSnap = await get(ref(rd,`staff/${id}`)); const wasHost = delSnap.exists() && delSnap.val().role === 'Host'; await remove(ref(rd,`staff/${id}`)); if(wasHost) await remove(ref(rd, `hostWallet/${id}`)).catch(()=>{}); LOG_ACT('staff','Deleted Staff', `UID: ${id}`); CLR_CACHE(['staff','hostWallet']); TS('Staff Deleted'); await RX_ST(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO(); } } }
+                if(a==='d-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(await UI_CONFIRM("Are you sure you want to permanently delete this Staff Member?")) { if(CF_LIVE) { await deleteStaffCF(id); LOG_ACT('staff','Deleted Staff', `UID: ${id}`); CLR_CACHE(['staff','hostWallet']); TS('Staff Deleted'); await RX_ST_CF(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO_CF(); } else { const delSnap = await get(ref(rd,`staff/${id}`)); const wasHost = delSnap.exists() && delSnap.val().role === 'Host'; await remove(ref(rd,`staff/${id}`)); if(wasHost) await remove(ref(rd, `hostWallet/${id}`)).catch(()=>{}); LOG_ACT('staff','Deleted Staff', `UID: ${id}`); CLR_CACHE(['staff','hostWallet']); TS('Staff Deleted'); await RX_ST(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO(); } } }
                 if(a==='susp-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(CF_LIVE) { await updateStaffCF(id, {status: 'suspended'}); LOG_ACT('staff','Suspended Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Suspended'); await RX_ST_CF(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO_CF(); } else { await update(ref(rd,`staff/${id}`), {status: 'suspended'}); LOG_ACT('staff','Suspended Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Suspended'); await RX_ST(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO(); } }
                 if(a==='act-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(CF_LIVE) { await updateStaffCF(id, {status: 'active'}); LOG_ACT('staff','Activated Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Activated'); await RX_ST_CF(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO_CF(); } else { await update(ref(rd,`staff/${id}`), {status: 'active'}); LOG_ACT('staff','Activated Staff', `UID: ${id}`); CLR_CACHE('staff'); TS('Staff Activated'); await RX_ST(); if(document.getElementById('hosts-section').classList.contains('active')) await RX_HO(); } }
                 if(a==='notify-host'){ if(!CHK_P('notif_mgt')) return TS('Unauthorized','error'); E('fmHostPush').reset(); E('hpUid').value = id; E('hpHostName').textContent = b.dataset.name || 'Host'; ML['hostPushModal'].show(); }
                 if(a==='adj-host-wallet'){ if(!CHK_P('host_mgt')) return TS('Unauthorized','error'); E('fmHostWalletAdj').reset(); E('hwUid').value = id; E('hwHostName').textContent = b.dataset.name || 'Host'; E('hwCurrentBal').textContent = P2R(Number(b.dataset.bal)||0).toFixed(2); SHOW_MODAL_CLEAN('hostWalletModal'); }
-                if(a==='ban-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(confirm("Ban this Host? They will immediately lose all Host Panel access.")) { if(CF_LIVE) { await updateStaffCF(id, {status: 'banned'}); LOG_ACT('staff','Banned Host', `UID: ${id}`); CLR_CACHE('staff'); TS('Host Banned', 'warning'); await RX_HO_CF(); } else { await update(ref(rd,`staff/${id}`), {status: 'banned'}); LOG_ACT('staff','Banned Host', `UID: ${id}`); CLR_CACHE('staff'); TS('Host Banned', 'warning'); await RX_HO(); } } }
+                if(a==='ban-st'){ if(!CHK_P('staff_mgt')) return TS('Unauthorized','error'); if(await UI_CONFIRM("Ban this Host? They will immediately lose all Host Panel access.")) { if(CF_LIVE) { await updateStaffCF(id, {status: 'banned'}); LOG_ACT('staff','Banned Host', `UID: ${id}`); CLR_CACHE('staff'); TS('Host Banned', 'warning'); await RX_HO_CF(); } else { await update(ref(rd,`staff/${id}`), {status: 'banned'}); LOG_ACT('staff','Banned Host', `UID: ${id}`); CLR_CACHE('staff'); TS('Host Banned', 'warning'); await RX_HO(); } } }
 
                 // v5 CHANGE: manual approve-host-reward / reject-host-reward actions
                 // removed entirely (previously here). Host rewards are now ONLY ever
@@ -6709,7 +7293,7 @@
                 if(a==='e-an'){ if(!CHK_P('promo_mgt')) return TS('Unauthorized','error'); E('fmAnnouncement').reset(); try { const an = CF_LIVE ? (await CF.get('announcements')).announcements.find(x=>x.id===id) : (await get(ref(rd,`announcements/${id}`))).val(); if(!an) throw new Error('not found'); E('anId').value = id; E('anText').value = an.text; E('anStatus').value = an.status || 'active'; if([10, 15, 25].includes(Number(an.speed))) { E('anSpeed').value = an.speed; E('anCustomSpeedDiv').style.display = 'none'; } else { E('anSpeed').value = 'custom'; E('anCustomSpeed').value = an.speed || 15; E('anCustomSpeedDiv').style.display = 'block'; } ML['announcementModal'].show(); } catch(err) { TS('Error fetching data', 'error'); } }
                 if(a==='tg-an'){ if(!CHK_P('promo_mgt')) { b.checked = !b.checked; return TS('Unauthorized','error'); } const newStatus = b.checked ? 'active' : 'inactive'; if(CF_LIVE) { await setAnnouncementStatusCF(id, newStatus); TS(`Announcement is now ${newStatus}`); } else { await update(ref(rd, `announcements/${id}`), { status: newStatus, updatedAt: Date.now() }); TS(`Announcement is now ${newStatus}`); } }
                 if(a==='toggle-sched-notif'){ if(!CHK_P('notif_mgt')) { b.checked = !b.checked; return TS('Unauthorized','error'); } await CF.put(`scheduled-notifications/${id}`, { enabled: b.checked }); LOG_ACT('staff', 'Toggled Scheduled Notification', id); TS(`Schedule ${b.checked ? 'Enabled' : 'Disabled'}`); }
-                if(a==='del-sched-notif'){ if(!CHK_P('notif_mgt')) return TS('Unauthorized','error'); if(confirm('Delete this scheduled notification?')) { await CF.del(`scheduled-notifications/${id}`); LOG_ACT('staff', 'Deleted Scheduled Notification', id); TS('Schedule Deleted'); await RX_SCHED_NOTIF_CF(); } }
+                if(a==='del-sched-notif'){ if(!CHK_P('notif_mgt')) return TS('Unauthorized','error'); if(await UI_CONFIRM('Delete this scheduled notification?')) { await CF.del(`scheduled-notifications/${id}`); LOG_ACT('staff', 'Deleted Scheduled Notification', id); TS('Schedule Deleted'); await RX_SCHED_NOTIF_CF(); } }
                 if(a==='e-ga'){ if(!CHK_P('game_mgt') && !CHK_P('match_edit')) return TS('Unauthorized','error'); E('fmGame').reset(); const g=CF_LIVE ? (GC[id] || (await CF.get('games')).games.find(x=>x.id===id)) : (await get(ref(rd,`games/${id}`))).val(); if(!g) return TS('Game not found','error'); E('gaId').value=id; E('gaN').value=g.name; E('gaU').value=g.imageUrl||''; E('gaStatus').value=g.status||'active'; ML['gameModal'].show(); }
                 if(a==='e-md'){ if(!CHK_P('mode_mgt')) return TS('Unauthorized','error'); E('fmMode').reset(); const m=CF_LIVE ? (MC[id] || (await CF.get('modes')).modes.find(x=>x.id===id)) : (await get(ref(rd,`modes/${id}`))).val(); if(!m) return TS('Mode not found','error'); E('mdId').value=id; if(!Object.keys(GC).length) { if(CF_LIVE) await RX_GA_CF().catch(()=>{}); else await RX_GA().catch(()=>{}); } E('mdGameId').innerHTML = '<option value="">Select Game</option>' + Object.entries(GC).map(([gid,g])=>`<option value="${gid}" ${gid===m.gameId?'selected':''}>${g.name}</option>`).join(''); E('mdName').value=m.name; E('mdThumbU').value=m.thumbnailUrl||''; E('mdRules').value=m.rules||''; E('mdStatus').value=m.status||'active'; ML['modeModal'].show(); }
                 if(a==='e-pr'){ if(!CHK_P('promo_mgt')) return TS('Unauthorized','error'); E('fmPromo').reset(); const p=CF_LIVE ? (await CF.get('promotions')).promotions.find(x=>x.id===id) : (await get(ref(rd,`promotions/${id}`))).val(); if(!p) return TS('Promotion not found','error'); E('prId').value=id; E('prTitle').value=p.title||''; E('prDesc').value=p.description||''; E('prTime').value=p.sliderTime||5; E('prU').value=p.imageUrl; E('prT').value=p.link||''; E('prS').checked=p.active!==false; ML['promoModal'].show(); }
@@ -6881,7 +7465,7 @@
 
                 if(a==='submit-host-report') {
                     const tid = b.dataset.tid;
-                    if(!confirm("Submit this report to Admin? You will not be able to edit this match once submitted.")) return;
+                    if(!await UI_CONFIRM("Submit this report to Admin? You will not be able to edit this match once submitted.")) return;
 
                     /* CUTOVER 2026-07-24: writes through submitHostReportCF (POST
                      * /matches/:id/host-report). The Worker records each player's kills/rank into
@@ -6954,7 +7538,7 @@
                 if(a==='kck-plyr'){
                     if(!CHK_P('match_edit')) return TS('Unauthorized', 'error');
                     const tid = b.dataset.tid, uid = b.dataset.uid;
-                    if(confirm("Are you sure you want to kick this player from the match?\nNote: Entry fee will NOT be auto-refunded.")) {
+                    if(await UI_CONFIRM("Are you sure you want to kick this player from the match?\nNote: Entry fee will NOT be auto-refunded.")) {
                         /* CUTOVER 2026-07-24: writes through kickPlayerCF (DELETE
                          * /matches/:id/players/:uid) -- removes the row and frees the capacity the
                          * player held so the slot is rejoinable, no entry-fee refund (faithful to the
@@ -6990,7 +7574,15 @@
                      * and hosts, and the Worker now syncs it to users.email on save. 3 live host
                      * accounts had no login email at all, so leaving this read-only meant they
                      * could never sign in no matter what password was set. */
-                    E('stId').value=id; E('stHd').textContent="Edit Staff Member"; E('stN').value=s.name; E('stRole').value=s.role||'Staff'; E('stE').value=s.email || ''; E('stE').readOnly=!CF_LIVE; E('stP').required=false; E('stP').value='';
+                    E('stId').value=id; E('stHd').textContent="Edit Staff Member"; E('stN').value=s.name; E('stRole').value=s.role||'Staff'; E('stE').value=s.email || ''; E('stE').readOnly=!CF_LIVE;
+                    // BUG FIX 2026-08-02: stE is `required` in the HTML (needed for account
+                    // creation), but was never un-required here for editing -- so an admin could
+                    // not save ANY change (including just a password reset) for the 3 host accounts
+                    // the July 31 fix already knew had no login email, since the browser silently
+                    // blocked the form submit on the empty required field with zero visible error.
+                    // updateStaffCF already treats a blank email as "leave unchanged" server-side.
+                    E('stE').required=false;
+                    E('stP').required=false; E('stP').value='';
                     E('stPx').style.display = CF_LIVE ? 'block' : 'none';
                     if(E('stPLabel')) E('stPLabel').textContent = CF_LIVE ? 'Set New Password (leave blank to keep current)' : 'Password';
                     if(E('stMobile')) E('stMobile').value = s.mobile || '';
@@ -7093,28 +7685,9 @@
                              * `deposit` covers both a real top-up and a manual admin credit -- the
                              * note prefix (OVD_OP: = the fmAdj override above) is what tells them
                              * apart, same convention the Worker writes. */
-                            const LEDGER_LABEL = {
-                                match_winning: ['Match Winning','success'], refund: ['Refund','success'],
-                                match_entry_fee: ['Entry Fee','danger'], match_entry: ['Result Adjustment','danger'],
-                                match_deduction: ['Result Adjustment','danger'], deduction: ['Wallet Adjustment (Debit)','danger'],
-                                coupon_claim: ['Coupon Code','info'], redeem_code: ['Redeem Code Claim','info'],
-                                promo_signup: ['Signup Bonus','info'], referral_bonus: ['Referral Bonus','info'],
-                                withdrawal: ['Withdrawal','danger'],
-                            };
-                            const TIER_LABEL = { deposit: 'Deposit', winnings: 'Winning', bonus: 'Bonus' };
-                            let tH = '';
-                            (dl.ledger || []).forEach(r => {
-                                let label, color;
-                                if (r.transactionType === 'deposit') {
-                                    [label, color] = String(r.note||'').startsWith('OVD_OP:') ? ['Wallet Adjustment (Credit)','success'] : ['Deposit','success'];
-                                } else {
-                                    [label, color] = LEDGER_LABEL[r.transactionType] || [r.transactionType || 'Transaction', r.isCredit ? 'success' : 'danger'];
-                                }
-                                const tierNote = TIER_LABEL[r.tier] ? `${TIER_LABEL[r.tier]} wallet` : '';
-                                const note = [r.note, tierNote].filter(Boolean).join(' · ');
-                                tH += `<tr><td><small class="font-monospace">${DT(r.createdAt)}</small></td><td><span class="badge-premium badge-${color}">${ESC(label)}</span>${note?`<br><small class="text-muted">${ESC(note)}</small>`:''}</td><td class="fw-bold font-monospace ${r.isCredit?'text-success':'text-danger'}">${r.isCredit?'+':'-'}${FMT_C(P2R(r.amount).toFixed(2))}</td><td><span class="badge bg-dark border border-secondary text-success">COMPLETED</span></td></tr>`;
-                            });
-                            E('tbUsrTxn').innerHTML = tH || `<tr><td colspan="4" class="text-center text-muted py-4">No Transactions Found</td></tr>`;
+                            CUR_USER_LEDGER = dl.ledger || [];
+                            if (E('usrTxnFilter')) E('usrTxnFilter').value = '';
+                            renderUserLedgerRows();
                         } catch(err) { E('tbUsrTxn').innerHTML = errRow(err); }
                       } else {
                         // v5 FEATURE (point 10): show the match's #ID alongside its name -
@@ -7319,7 +7892,7 @@
                 if(a==='remove-ms-slot'){
                     if (!CHK_P('match_add') && !CHK_P('match_edit')) return TS('Unauthorized','error');
                     const idx = Number(b.dataset.idx);
-                    if (!confirm('Remove this slot from the schedule?')) return;
+                    if (!await UI_CONFIRM('Remove this slot from the schedule?')) return;
                     window.MS_STATE[MS_ACTIVE_TAB].slots.splice(idx, 1);
                     if (await saveMsSlotsCF()) { TS('Slot removed'); renderMsSlotList(); }
                 }
@@ -7413,7 +7986,7 @@
                     if(!CHK_P('sys_set')) return TS('Unauthorized','error');
                     if(!CF_LIVE) return TS('Auth settings require the Cloudflare backend', 'error');
                     const otpEnabled = E('otpEnabledToggle').checked;
-                    if(otpEnabled && !confirm('Enable OTP authentication?\n\nAll users will need a one-time code in addition to their password to log in. Make sure a real OTP provider is configured and tested first.')) { await loadAuthSettingsUI(); return; }
+                    if(otpEnabled && !await UI_CONFIRM('Enable OTP authentication?\n\nAll users will need a one-time code in addition to their password to log in. Make sure a real OTP provider is configured and tested first.')) { await loadAuthSettingsUI(); return; }
                     /* CUTOVER 2026-07-25: PUT /auth/settings. The Worker audit-logs the change itself
                      * (handleUpdateAuthSettings), so no LOG_ACT here to avoid a duplicate entry. It
                      * also refuses to enable OTP with no provider (409) — surfaced as the error toast. */
@@ -7450,7 +8023,7 @@
 
                 if(a==='delete-otp-provider'){
                     if(!CHK_P('sys_set')) return TS('Unauthorized','error');
-                    if(!confirm('Remove the OTP provider configuration? OTP mode will be disable-able until you configure one again.')) return;
+                    if(!await UI_CONFIRM('Remove the OTP provider configuration? OTP mode will be disable-able until you configure one again.')) return;
                     try { await deleteOtpProviderCF(); TS('OTP provider removed', 'success'); await loadAuthSettingsUI(); }
                     catch(err) { TS(err.message || 'Could not remove', 'error'); }
                 }
@@ -7489,7 +8062,7 @@
                 if(a==='delete-sc'){
                     if(!CHK_P('sup_mgt')) return TS('Unauthorized','error');
                     const uid = b.dataset.uid;
-                    if(!confirm('Delete this conversation? This removes it and all its messages permanently.')) return;
+                    if(!await UI_CONFIRM('Delete this conversation? This removes it and all its messages permanently.')) return;
                     if(CF_LIVE) { await deleteTicketCF(id); }
                     else { if(!uid) return TS('Missing ticket owner','error'); await remove(ref(rd, `supportChats/${uid}/${id}`)); }
                     TS('Conversation deleted', 'success');
@@ -7984,20 +8557,11 @@
         E('commRouteForm').onsubmit = e => { e.preventDefault(); A_EX(async () => { if(!CHK_P('sup_mgt')) return TS('Unauthorized','error'); if(CF_LIVE) { await saveSettingsCF({supportWa:E('cmWa').value, isWaActive:E('cmWaTog').checked, supportTg:E('cmTg').value, isTgActive:E('cmTgTog').checked, tawkToUrl:E('tkUrl').value, tawkToEnabled:E('tkTog').checked}); LOG_ACT('staff','Updated Support Routes', ''); TS('Support Links Saved'); } else { await update(ref(rd,'settings'), {supportWa:E('cmWa').value, isWaActive:E('cmWaTog').checked, supportTg:E('cmTg').value, isTgActive:E('cmTgTog').checked, tawkToUrl:E('tkUrl').value, tawkToEnabled:E('tkTog').checked}); LOG_ACT('staff','Updated Support Routes', ''); CLR_CACHE('settings'); TS('Support Links Saved'); } }, e.submitter || e.target.querySelector('button[type="submit"]')); };
 
         // Master on/off switch for the in-app ticket-chat feature (Android). WhatsApp/Telegram
-        // links above are unaffected — this only hides the "Chat with us" entry in the player app.
-        // CUTOVER 2026-07-24: writes through saveSettingsCF -- B_SYS now bootstraps SET.
-        // supportChatEnabled from Cloudflare too (Wave 1.7 confirmed the generic settings GET/PUT
-        // already serves this key with zero Worker changes needed), so a Firebase-only write here
-        // would silently never reach the value this toggle's own initial state reads.
-        E('scEnabledTog')?.addEventListener('change', () => {
-            A_EX(async () => {
-                if (!CHK_P('sup_mgt')) { E('scEnabledTog').checked = !E('scEnabledTog').checked; return TS('Unauthorized', 'error'); }
-                const enabled = E('scEnabledTog').checked;
-                if(CF_LIVE) { await saveSettingsCF({ supportChatEnabled: enabled }); } else { await update(ref(rd, 'settings'), { supportChatEnabled: enabled, updatedAt: Date.now() }); SET.supportChatEnabled = enabled; CLR_CACHE('settings'); }
-                LOG_ACT('staff', enabled ? 'Enabled Support Chat' : 'Disabled Support Chat', '');
-                TS(enabled ? 'Support chat enabled' : 'Support chat disabled', 'success');
-            });
-        });
+        // Admin Panel Support Chat section removed (staff never used it) -- the scEnabledTog
+        // on/off-switch listener that used to live here went with it. supportChatEnabled itself
+        // (the setting that hides/shows "Chat with us" in the Player app) is untouched at whatever
+        // value it's currently set to in `settings` -- the Player app's own support chat entry point
+        // is deliberately left alone, only the admin management UI was removed.
 
         // Manual verification scaffolding only (Part K step 7, Wave 1) -- module-scope `const`s
         // aren't reachable from the devtools console the way `window.UI`/`window.FMT_C` already
