@@ -876,6 +876,26 @@
 
             <section id="transaction-history-section" class="section">
                 <h3 class="fw-bold mb-4"><i class="bi bi-clock-history text-muted me-2"></i> Transactions History</h3>
+                <div class="glass-card p-3 mb-4"><div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Duration</label>
+                        <select class="form-select" id="txDurationFilter">
+                            <option value="2" selected>Last 2 Days</option>
+                            <option value="7">Last 7 Days</option>
+                            <option value="30">Last 30 Days</option>
+                            <option value="">All Time</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="txStatusFilter">
+                            <option value="all" selected>All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Successful</option>
+                            <option value="rejected">Failed</option>
+                        </select>
+                    </div>
+                </div></div>
                 <div class="glass-card p-0 overflow-hidden"><div class="table-responsive"><table class="table table-glass mb-0"><thead><tr><th>Date & Time</th><th>Transaction Type</th><th>User Details</th><th>Amount</th><th>Status</th><th>Details / Ref</th></tr></thead><tbody id="tbLedger"></tbody></table></div></div>
             </section>
 
@@ -5944,9 +5964,16 @@
         const RX_TX_CF = async (loadMore = false) => {
             TX_LIMIT = loadMore ? TX_LIMIT + 100 : 100;
             if (!loadMore) E('tbLedger').innerHTML = PHO(6);
+            // Duration filter defaults to "Last 2 Days" (see the <select>'s own default option) --
+            // deliberately server-side (since=) rather than fetching everything and filtering
+            // client-side, so a wide-open date range doesn't cost a bigger D1 read than necessary.
+            const statusFilter = E('txStatusFilter')?.value || 'all';
+            const durationDays = Number(E('txDurationFilter')?.value) || 0;
+            const since = durationDays > 0 ? Date.now() - durationDays * 86400000 : 0;
+            const qs = `status=${encodeURIComponent(statusFilter)}&limit=${TX_LIMIT}${since ? `&since=${since}` : ''}`;
             const [dRes, wRes] = await Promise.allSettled([
-                CF.get(`deposits?status=all&limit=${TX_LIMIT}`),
-                CF.get(`withdrawals?status=all&limit=${TX_LIMIT}`),
+                CF.get(`deposits?${qs}`),
+                CF.get(`withdrawals?${qs}`),
             ]);
             const d = dRes.status === 'fulfilled' ? dRes.value : null;
             const w = wRes.status === 'fulfilled' ? wRes.value : null;
@@ -5970,6 +5997,11 @@
             if (!w) h = `<tr><td colspan="6" class="text-center text-warning small py-2">Withdrawals hidden -- missing permission.</td></tr>` + h;
             E('tbLedger').innerHTML = h || `<tr><td colspan="6" class="text-center text-muted py-4">No Transactions Yet</td></tr>`;
         };
+        // Changing either filter re-runs from page 1 (loadMore=false resets TX_LIMIT back to the
+        // base page size) -- CF-live only, matching every other CF-vs-legacy branch in this file.
+        ['txDurationFilter', 'txStatusFilter'].forEach(id => {
+            if (E(id)) E(id).addEventListener('change', () => { if (CF_LIVE) RX_TX_CF(); else RX_TX(); });
+        });
 
         const RX_WD = async () => {
             const s = CUR_WD_STATUS;
