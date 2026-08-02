@@ -2365,7 +2365,7 @@
                 else if(id==='leaderboard-mgt-section') { if(CF_LIVE) await RX_LB_CF(); else { if(!PAGE_CACHE['users']) E('tbRanks').innerHTML=PHO(3); const s=await fetchWithCache('users'); UC={}; if(s.exists()) s.forEach(c => {UC[c.key]=c.val();}); await RX_LB(); } }
                 else if(id==='users-section') { if(CF_LIVE) await RX_US_CF(); else { if(!PAGE_CACHE['users']) E('tbUsers').innerHTML=PHO(5); const s=await fetchWithCache('users'); UC={}; if(s.exists()) s.forEach(c => {UC[c.key]=c.val();}); await R_US(); } }
                 else if(id==='user-analytics-section') { if(CF_LIVE) await RX_UA_CF(); else await RX_UA(); }
-                else if(id==='transaction-history-section') await RX_TX();
+                else if(id==='transaction-history-section') { if(CF_LIVE) await RX_TX_CF(); else await RX_TX(); }
                 else if(id==='withdrawals-section') { if(CF_LIVE) await RX_WD_CF(); else await RX_WD(); }
                 else if(id==='deposit-section') { if(CF_LIVE) { await RX_DP_CF('pending'); await RX_DP_CF('success'); await RX_DP_CF('failed'); } else { await RX_DP('pending'); await RX_DP('success'); await RX_DP('failed'); } }
                 else if(id==='referrals-section') { if(CF_LIVE) { await RX_RF_CF('pending'); await RX_RF_AN_CF(); } else { await RX_RF('pending'); await RX_RF('completed'); await RX_RF_AN(); } }
@@ -5922,6 +5922,55 @@
             } catch(e) { E('tbLedger').innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading records</td></tr>`; }
         };
 
+        /* CF sibling (2026-08-03) -- this section had NO CF-live version at all, unlike every other
+         * tab in this file: the section-open dispatcher called RX_TX() unconditionally even after
+         * CF_LIVE went true elsewhere. deposits/withdrawals write to D1 only now (see
+         * handlers/deposits.ts / handlers/withdrawals.ts in the Worker -- no Firebase mirror write
+         * exists), so this tab had been silently reading a FROZEN Firebase snapshot from whenever
+         * that domain's own cutover happened, not real current transactions. Merges GET /deposits
+         * and GET /withdrawals (both ?status=all, same growing-TX_LIMIT idiom as the Firebase
+         * version above) the same way RX_TX already did client-side. Both endpoints already join
+         * displayName/email (this session's earlier fix), so WARM_UC + FORMAT_USER resolves real
+         * names instead of "Unknown" too.
+         *
+         * Deliberately Promise.allSettled, not Promise.all: this section is nav-gated on the
+         * 'analytics' permission alone, but GET /deposits requires dep_appr and GET /withdrawals
+         * requires wd_appr specifically -- Tournament Manager and Marketing Manager (see the role
+         * preset table) have 'analytics' without either. The old Firebase read had no such per-
+         * endpoint split, so a hard Promise.all here would silently regress those two roles from
+         * "can view (stale) history" to "tab errors out entirely". Each source degrades on its own:
+         * still show whichever one the caller *is* allowed to see, and only show the permission
+         * message for a source that's actually denied. */
+        const RX_TX_CF = async (loadMore = false) => {
+            TX_LIMIT = loadMore ? TX_LIMIT + 100 : 100;
+            if (!loadMore) E('tbLedger').innerHTML = PHO(6);
+            const [dRes, wRes] = await Promise.allSettled([
+                CF.get(`deposits?status=all&limit=${TX_LIMIT}`),
+                CF.get(`withdrawals?status=all&limit=${TX_LIMIT}`),
+            ]);
+            const d = dRes.status === 'fulfilled' ? dRes.value : null;
+            const w = wRes.status === 'fulfilled' ? wRes.value : null;
+            if (!d && !w) {
+                E('tbLedger').innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${ESC((dRes.reason && dRes.reason.message) || 'Error loading records')}</td></tr>`;
+                return;
+            }
+            const a = [];
+            (d?.deposits || []).forEach(v => {
+                WARM_UC(v.userId, v);
+                a.push({ t: 'Deposit', d: v.createdAt, u: v.userId, am: v.amount, s: v.status, ctx: v.method || v.utr || '--' });
+            });
+            (w?.withdrawals || []).forEach(v => {
+                WARM_UC(v.userId, v);
+                a.push({ t: v.method === 'redeem' ? 'Redeem Withdraw' : 'Cash Withdraw', d: v.createdAt, u: v.userId, am: v.amount, s: v.status, ctx: v.upi || v.method || '--' });
+            });
+            a.sort((x,y)=>(Number(y.d)||0)-(Number(x.d)||0)); let h='';
+            a.forEach(x=>{ h+=`<tr><td><small class="font-monospace">${DT(x.d)}</small></td><td><span class="badge-premium badge-${x.t==='Deposit'?'success':'danger'}">${x.t}</span></td><td>${FORMAT_USER(x.u)}</td><td class="text-white fw-bold font-monospace fs-6">${FMT_C(P2R(x.am))}</td><td><span class="badge bg-dark border border-secondary text-${(x.s==='completed'||x.s==='approved'||x.s==='success')?'success':(x.s==='pending'?'warning':'danger')}">${(x.s||'').toUpperCase()}</span></td><td><div class="text-truncate text-muted small" style="max-width:120px;" title="${x.ctx}">${x.ctx}</div></td></tr>`; });
+            if ((d && d.hasMore) || (w && w.hasMore)) h += `<tr><td colspan="6" class="text-center"><button class="btn btn-sm btn-outline-secondary" data-action="load-more-tx">Load more</button></td></tr>`;
+            if (!d) h = `<tr><td colspan="6" class="text-center text-warning small py-2">Deposits hidden -- missing permission.</td></tr>` + h;
+            if (!w) h = `<tr><td colspan="6" class="text-center text-warning small py-2">Withdrawals hidden -- missing permission.</td></tr>` + h;
+            E('tbLedger').innerHTML = h || `<tr><td colspan="6" class="text-center text-muted py-4">No Transactions Yet</td></tr>`;
+        };
+
         const RX_WD = async () => {
             const s = CUR_WD_STATUS;
             try {
@@ -7208,7 +7257,7 @@
                 if(a==='set-theme') { const t = b.dataset.themeVal; document.documentElement.setAttribute('data-theme', t); localStorage.setItem('admin_theme', t); document.querySelectorAll('[data-action="set-theme"]').forEach(btn => btn.classList.remove('active-theme')); b.classList.add('active-theme'); TS('Theme applied successfully', 'success'); }
                 if(a==='load-more-ml') { await RX_ML(true); }
                 if(a==='load-more-sl') { await RX_SL(true); }
-                if(a==='load-more-tx') { await RX_TX(true); }
+                if(a==='load-more-tx') { if(CF_LIVE) await RX_TX_CF(true); else await RX_TX(true); }
                 if(a==='load-more-dp') { await RX_DP_CF(b.dataset.status, true); }
                 if(a==='load-more-wd') { await RX_WD_CF(true); }
                 if(a==='goto-search-section') {
