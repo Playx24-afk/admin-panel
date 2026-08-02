@@ -946,6 +946,11 @@
                      <h3 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-2"></i> Matches List</h3>
                      <div class="d-flex gap-2">
                          <button class="btn btn-outline-danger fw-bold" id="btnBulkDeleteMatch" style="display: none;" data-action="bulk-delete-match"><i class="bi bi-trash-fill"></i> Delete Selected</button>
+                         <!-- 2026-08-03: multi-slot matches that never fill never auto-cancel (only 2-slot
+                              Lone Wolf does) -- this cancels+refunds (never hard-deletes) every currently
+                              past-dated still-"Upcoming" match found server-side (GET/POST
+                              /admin/stale-upcoming-matches[/cleanup]). -->
+                         <button class="btn btn-outline-warning fw-bold" id="btnCleanupStaleMatches" data-action="cleanup-stale-matches"><i class="bi bi-hourglass-split"></i> Clean Up Stale Matches</button>
                          <button class="btn btn-outline-primary fw-bold text-white" id="btnBulkMatch" data-action="bulk-match"><i class="bi bi-layers-fill"></i> Bulk Generate</button>
                          <button class="btn-premium" id="btnCreateMatch" data-action="add-match"><i class="bi bi-plus-lg"></i> Create Match</button>
                      </div>
@@ -3640,6 +3645,15 @@
         const updateMatchCF = async (id, d) => { return await CF.put(`matches/${id}`, toMatchRequestBodyCF(d)); };
         const cancelMatchCF = async (id) => { return await CF.post(`matches/${id}/cancel`); };
         const deleteMatchCF = async (id) => { return await CF.del(`matches/${id}`); };
+        /* 2026-08-03: multi-slot matches that never fill never auto-cancel (only 2-slot Lone Wolf
+         * does, see fcm/autoCancel.ts) -- these back the "Clean Up Stale Matches" button, which
+         * cancels+refunds (never hard-deletes) every currently past-dated still-"Upcoming" match. */
+        const listStaleMatchesCF = async () => { return await CF.get('admin/stale-upcoming-matches'); };
+        const cleanupStaleMatchesCF = async () => { return await CF.post('admin/stale-upcoming-matches/cleanup'); };
+        /* Clears a claimed Match-Scheduler range's record (not the matches themselves) so it can be
+         * regenerated -- e.g. after deleting a batch that turned out wrong, same class of incident as
+         * the 2026-08-03 paise-conversion bug. */
+        const deleteSchedulerBatchCF = async (id) => { return await CF.del(`scheduler/batches/${id}`); };
 
         /* CUTOVER 2026-07-24: writes through bulkGenerateMatchesCF (POST /matches/bulk-generate)
          * instead of a client-side loop of Firebase pushes -- the Worker generates matchUniqueId,
@@ -3843,11 +3857,28 @@
                 return;
             }
             const span = overallEnd - overallStart;
+            // 2026-08-03: each segment is clickable -- clears just that range's claim record (NOT the
+            // matches it created, see deleteSchedulerBatchCF) so the range can be regenerated. Added
+            // after the paise-conversion bug forced a real admin to hand-delete a whole generated
+            // batch, then discover the overlap guard permanently refused to let them regenerate it.
             bar.innerHTML = generated.map(g => {
                 const left = ((g.from - overallStart) / span) * 100;
                 const width = ((g.until - g.from) / span) * 100;
-                return `<div title="${fmtIstTime(g.from)} - ${fmtIstTime(g.until)} (${g.createdCount} match(es))" style="position:absolute; left:${left}%; width:${width}%; top:0; bottom:0; background:var(--success); opacity:0.85;"></div>`;
+                return `<div class="ms-coverage-batch" data-batch-id="${g.id}" title="${fmtIstTime(g.from)} - ${fmtIstTime(g.until)} (${g.createdCount} match(es)) -- click to clear this range so it can be regenerated" style="position:absolute; left:${left}%; width:${width}%; top:0; bottom:0; background:var(--success); opacity:0.85; cursor:pointer;"></div>`;
             }).join('');
+            bar.querySelectorAll('.ms-coverage-batch').forEach(el => {
+                el.onclick = () => A_EX(async () => {
+                    if (!CHK_P('match_add')) return TS('Unauthorized', 'error');
+                    if (!confirm('Clear this generated range\'s claim so it can be regenerated?\n\nThis does NOT delete any matches -- if matches from this range still exist and are wrong, delete or cancel them first.')) return;
+                    try {
+                        await deleteSchedulerBatchCF(el.dataset.batchId);
+                        TS('Range cleared -- it can now be regenerated.', 'success');
+                        await refreshMsCoverage();
+                    } catch (e) {
+                        TS(e.message || 'Could not clear range', 'error');
+                    }
+                }, el);
+            });
             const coveredMs = generated.reduce((sum, g) => sum + (g.until - g.from), 0);
             const pct = span > 0 ? Math.round((coveredMs / span) * 100) : 0;
             legend.innerHTML = `<i class="bi bi-square-fill text-success"></i> Generated (${pct}%) &nbsp; <i class="bi bi-square text-muted"></i> Remaining &nbsp;&middot;&nbsp; Schedule window: ${fmtIstTime(overallStart)} - ${fmtIstTime(overallEnd)}`;
@@ -7395,6 +7426,32 @@
                         if(E('selectAllMatches')) E('selectAllMatches').checked = false;
                         if(typeof checkBulkDeleteMatchBtn === 'function') checkBulkDeleteMatchBtn();
                         if(CF_LIVE) await RX_TR_CF(); else await RX_TR();
+                    }
+                }
+
+                /* 2026-08-03: "Clean Up Stale Matches" -- CF-only (no Firebase equivalent was ever
+                 * built for this, it's a new feature). Cancels+refunds (see cancelTournamentWithRefunds
+                 * server-side), never a hard delete, so any real registered player gets their entry
+                 * fee back instead of it being silently stranded. */
+                if(a==='cleanup-stale-matches') {
+                    if(!CHK_P('match_edit')) return TS('Unauthorized','error');
+                    if(!CF_LIVE) return TS('Not available in this mode.','error');
+                    try {
+                        const preview = await listStaleMatchesCF();
+                        const matches = preview.matches || [];
+                        if (matches.length === 0) { TS('No stale matches found -- nothing to clean up.', 'success'); return; }
+                        const totalRegistered = matches.reduce((sum, m) => sum + (Number(m.registeredCount) || 0), 0);
+                        const warn = totalRegistered > 0
+                            ? `${totalRegistered} registered player(s) across them will be REFUNDED to their deposit wallet.`
+                            : 'None of them have any registered players.';
+                        if (!confirm(`Found ${matches.length} stale match(es) -- still "Upcoming" but their start time has already passed, and more than 2 slots so they never auto-cancelled. ${warn}\n\nCancel and refund all ${matches.length} now?`)) return;
+                        const res = await cleanupStaleMatchesCF();
+                        try{ await LOG_ACT('match', 'Cleaned Up Stale Matches', `Cancelled: ${res.cancelled}, Refunded players: ${res.totalRefundedPlayers}`); }catch(e){}
+                        TS(`Cancelled ${res.cancelled} stale match(es) -- refunded ${res.totalRefundedPlayers} player(s).`, 'success');
+                        CLR_CACHE('tournaments');
+                        await RX_TR_CF();
+                    } catch(e) {
+                        TS(e.message || 'Cleanup failed', 'error');
                     }
                 }
 
