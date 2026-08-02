@@ -7598,7 +7598,12 @@
                             // withdrawals/referrals so FORMAT_USER doesn't fall back to "Unknown"
                             // via an unwarmed UC. Not to be confused with p.gameName/p.gameUid
                             // below (the in-game identity for THIS match, always shown correctly).
-                            WARM_UC(p.userId, { displayName: p.userName, email: p.userEmail });
+                            // phone included too -- users.phone_number is NOT NULL (this app is
+                            // phone-based; email is often absent/synthetic and shows "Unknown" for
+                            // most accounts), so it's the more useful identifier staff actually
+                            // wanted visible here. FORMAT_USER already renders a phone line right
+                            // under the name whenever one is present.
+                            WARM_UC(p.userId, { displayName: p.userName, email: p.userEmail, phone: p.userPhone });
                             const pName = p.gameName || p.userName || 'Unknown Player';
                             const pUid = p.gameUid || 'Unknown UID';
                             const safeName = pName.replace(/'/g, "\\'");
