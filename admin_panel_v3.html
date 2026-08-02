@@ -5913,8 +5913,12 @@
                         // older app builds predating this field leave it null, so fall back to a clear flag
                         // rather than silently showing nothing.
                         const details = `${w.upi||'--'}<br><span class="${w.accountHolderName ? 'text-info' : 'text-danger'}">${w.accountHolderName ? ESC(w.accountHolderName) : 'Not provided'}</span>`;
-                        if(s==='pending') h+=`<td><small class="text-warning fw-bold bg-dark px-2 p-1 rounded font-monospace border border-secondary d-inline-block" style="white-space:nowrap;">${details}</small></td><td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-success fw-bold py-1" data-action="ap-w-cf" data-id="${w.id}"><i class="bi bi-check-lg"></i> Approve</button><button class="btn btn-sm btn-outline-danger fw-bold py-1" data-action="rj-w-cf" data-id="${w.id}"><i class="bi bi-x-lg"></i> Reject</button></div></td>`;
-                        else if(s==='completed') h+=`<td><small class="text-muted fw-bold font-monospace d-inline-block" style="white-space:nowrap;">${details}</small></td><td><small class="text-success text-truncate d-inline-block" style="max-width:120px;">${w.adminNote||'--'}</small></td>`;
+                        // No nowrap/max-width here on purpose -- a long UPI id or account holder name
+                        // must stay fully visible for the verification this field exists for, not get
+                        // clipped or run off the row. overflow-wrap covers unbroken tokens (UPI ids
+                        // have no spaces to wrap on) that would otherwise overflow the cell anyway.
+                        if(s==='pending') h+=`<td><small class="text-warning fw-bold bg-dark px-2 p-1 rounded font-monospace border border-secondary d-inline-block" style="overflow-wrap:anywhere; max-width:220px;">${details}</small></td><td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-success fw-bold py-1" data-action="ap-w-cf" data-id="${w.id}"><i class="bi bi-check-lg"></i> Approve</button><button class="btn btn-sm btn-outline-danger fw-bold py-1" data-action="rj-w-cf" data-id="${w.id}"><i class="bi bi-x-lg"></i> Reject</button></div></td>`;
+                        else if(s==='completed') h+=`<td><small class="text-muted fw-bold font-monospace d-inline-block" style="overflow-wrap:anywhere; max-width:220px;">${details}</small></td><td><small class="text-success text-truncate d-inline-block" style="max-width:120px;">${w.adminNote||'--'}</small></td>`;
                         else h+=`<td><small class="text-danger text-truncate d-inline-block" style="max-width:150px;">${w.rejectReason||'--'}</small></td>`;
                         h+='</tr>';
                     });
