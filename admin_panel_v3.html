@@ -1612,8 +1612,10 @@
             <div class="col-md-6"><label class="form-label text-warning">Gap Between Matches (Minutes)</label><input type="number" class="form-control text-warning fw-bold" id="msSlotInt" value="0" min="0"></div>
         </div></div>
         <div class="col-12" id="msSlotRangeBatchFields" style="display:none;"><div class="row g-3">
-            <div class="col-md-6"><label class="form-label text-warning">Number of Matches <small class="text-muted">(spread evenly across the range)</small></label><input type="number" class="form-control text-warning fw-bold" id="msSlotSpreadCount" value="2" min="1" max="50"></div>
-            <div class="col-md-6"><label class="form-label text-warning">Matches per Timestamp <small class="text-muted">(parallel, same mode)</small></label><input type="number" class="form-control text-warning fw-bold" id="msSlotParallel" value="1" min="1" max="20"></div>
+            <div class="col-md-4"><label class="form-label text-primary">Gap Between Matches (Minutes) <small class="text-muted">(fixed spacing, starting at Start Time)</small></label><input type="number" class="form-control text-primary fw-bold" id="msSlotGapMinutes" value="0" min="0"></div>
+            <div class="col-md-4"><label class="form-label text-warning">Number of Matches <small class="text-muted">(spread evenly — only used if Gap above is 0)</small></label><input type="number" class="form-control text-warning fw-bold" id="msSlotSpreadCount" value="2" min="1" max="50"></div>
+            <div class="col-md-4"><label class="form-label text-warning">Matches per Timestamp <small class="text-muted">(parallel, same mode)</small></label><input type="number" class="form-control text-warning fw-bold" id="msSlotParallel" value="1" min="1" max="20"></div>
+            <div class="col-12"><small class="text-info" id="msSlotRangePreview"></small></div>
         </div></div>
         <div class="col-12 mt-2 pt-3 border-top border-glass"><h6 class="fw-bold mb-3 text-warning"><i class="bi bi-mic-fill"></i> Host Assignment (applies to every match this slot generates)</h6></div>
         <div class="col-md-4"><label class="form-label text-warning"><i class="bi bi-cash-coin"></i> Host Earning (<span class="c-sym">₹</span>)</label><input type="number" min="0" step="0.01" class="form-control font-monospace border-warning" id="msSlotHostEarn" placeholder="0.00" value="0"></div>
@@ -3660,7 +3662,9 @@
                 const modeNames = Array.isArray(s.modeNames) && s.modeNames.length ? s.modeNames.join(', ') : (s.modeName || '');
                 const qty = Number(s.quantity) || 1;
                 const batchInfo = s.rangeMode
-                    ? ` · ${s.spreadCount || 1} match(es) spread across the range, ${s.parallelPerTimestamp || 1} parallel at each`
+                    ? (Number(s.gapMinutes) > 0
+                        ? ` · every ${s.gapMinutes}m across the range, ${s.parallelPerTimestamp || 1} parallel at each`
+                        : ` · ${s.spreadCount || 1} match(es) spread across the range, ${s.parallelPerTimestamp || 1} parallel at each`)
                     : (qty > 1 ? ` · Batch of ${qty}${Number(s.intervalMinutes) > 0 ? `, ${s.intervalMinutes}m apart` : ''}` : '');
                 const hostInfo = s.hostId ? ' · Pre-assigned Host' : '';
                 const isEnabled = s.enabled !== false;
@@ -3879,7 +3883,39 @@
             E('msSlotEndTimeField').style.display = on ? 'block' : 'none';
             E('msSlotFixedBatchFields').style.display = on ? 'none' : 'block';
             E('msSlotRangeBatchFields').style.display = on ? 'block' : 'none';
+            updateMsSlotRangePreview();
         };
+
+        /* Live "what will this actually generate" preview -- mirrors domain/scheduler.ts's
+         * computeSlotOccurrences range-mode math (gapMinutes takes priority over spreadCount)
+         * so the admin sees the real resulting spacing/count before saving, not just the raw
+         * inputs. Purely informational -- the Worker is the actual source of truth at generation
+         * time. */
+        const updateMsSlotRangePreview = () => {
+            const el = E('msSlotRangePreview');
+            if (!el || !E('msSlotRangeMode').checked) { if (el) el.textContent = ''; return; }
+            const timeStr = E('msSlotTime').value, endStr = E('msSlotEndTime').value;
+            if (!timeStr || !endStr) { el.textContent = ''; return; }
+            const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+            const spanMin = toMin(endStr) - toMin(timeStr);
+            if (spanMin <= 0) { el.textContent = 'End time must be after start time.'; return; }
+            const gap = Math.max(0, Number(E('msSlotGapMinutes').value) || 0);
+            const parallel = Math.max(1, Math.min(20, Number(E('msSlotParallel').value) || 1));
+            let count, actualGapMin;
+            if (gap > 0) {
+                count = Math.min(50, Math.floor(spanMin / gap) + 1);
+                actualGapMin = gap;
+            } else {
+                const spread = Math.max(1, Math.min(50, Number(E('msSlotSpreadCount').value) || 1));
+                count = spread;
+                actualGapMin = spread > 1 ? Math.round(spanMin / (spread - 1)) : 0;
+            }
+            const total = count * parallel;
+            el.textContent = `Will generate ${total} match(es) — ${count} timestamp(s), ${actualGapMin}m apart${parallel > 1 ? ` × ${parallel} parallel per timestamp` : ''}.`;
+        };
+        ['msSlotTime', 'msSlotEndTime', 'msSlotGapMinutes', 'msSlotSpreadCount', 'msSlotParallel'].forEach(id => {
+            if (E(id)) E(id).addEventListener('input', updateMsSlotRangePreview);
+        });
 
         E('msSlotTeamMode').onchange = () => {
             const on = E('msSlotTeamMode').checked;
@@ -3921,6 +3957,7 @@
             E('msSlotMode').innerHTML = '<option value="">Select Game First...</option>';
             await populateMsSlotGameSelect();
             if(CF_LIVE) await loadHostsCF(); else await loadHosts();
+            updateMsSlotRangePreview();
             ML['msSlotModal'].show();
         }));
 
@@ -3961,6 +3998,11 @@
                     enabled: E('msSlotEnabled').checked,
                     rangeMode,
                     endTime: rangeMode ? E('msSlotEndTime').value : null,
+                    // gapMinutes (fixed spacing) takes priority server-side when > 0; spreadCount
+                    // (evenly-split, legacy) only applies when gapMinutes is 0/unset -- see
+                    // domain/scheduler.ts computeSlotOccurrences. Both still saved either way so
+                    // switching back to spreadCount-only later doesn't lose that value.
+                    gapMinutes: rangeMode ? Math.max(0, Number(E('msSlotGapMinutes').value) || 0) : null,
                     spreadCount: rangeMode ? Math.max(1, Math.min(50, Number(E('msSlotSpreadCount').value) || 1)) : null,
                     parallelPerTimestamp: rangeMode ? Math.max(1, Math.min(20, Number(E('msSlotParallel').value) || 1)) : null,
                     quantity: rangeMode ? null : Math.max(1, Math.min(50, Number(E('msSlotQty').value) || 1)),
@@ -7872,6 +7914,7 @@
                     E('msSlotEndTimeField').style.display = slot.rangeMode ? 'block' : 'none';
                     E('msSlotFixedBatchFields').style.display = slot.rangeMode ? 'none' : 'block';
                     E('msSlotRangeBatchFields').style.display = slot.rangeMode ? 'block' : 'none';
+                    E('msSlotGapMinutes').value = slot.gapMinutes || 0;
                     E('msSlotSpreadCount').value = slot.spreadCount || 2;
                     E('msSlotParallel').value = slot.parallelPerTimestamp || 1;
                     await populateMsSlotGameSelect(slot.gameId);
@@ -7912,6 +7955,7 @@
                             lastRow.querySelector('.msp-amt').value = amt;
                         });
                     }
+                    updateMsSlotRangePreview();
                     ML['msSlotModal'].show();
                 }
 
